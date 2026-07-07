@@ -1,0 +1,22 @@
+# Build output
+release/
+frontend/dist/
+
+# Dev artifacts
+frontend/node_modules/
+
+# Go
+*.exe
+*.test
+*.out
+*.syso
+
+# macOS
+.DS_Store
+
+# Env (runtime secrets / local overrides)
+.env.local
+.env.*.local
+
+# Handoff (AI context doc, not part of the repo)
+handoff.md
