@@ -320,7 +320,7 @@ func doRequirements() error {
 		switch target.GOOS {
 		case "darwin":
 			fmt.Println("      macOS host with Xcode Command Line Tools")
-			fmt.Println("      tools: xcrun, sips, iconutil")
+			fmt.Println("      tools: xcrun, sips, iconutil, codesign")
 		case "linux":
 			cc, cxx := compilersForTarget(target)
 			pkgConfig := pkgConfigForTarget(target)
@@ -379,7 +379,7 @@ func buildTargetBinary(tmpDir, tool string, buildPrefix []string, target buildTa
 		}
 	}
 	if target.GOOS == "windows" {
-		// GUI subsystem: no console window ever, matching what Wails produces.
+		// GUI subsystem: no console window ever.
 		ldParts = append(ldParts, "-H", "windowsgui")
 		sysoName, err := writeWindowsResource(targetDir, target, appID, appIcon, appTitle, appVersion)
 		if err != nil {
@@ -448,7 +448,7 @@ func targetEnv(target buildTarget, garbleScope string) []string {
 // which shells out to the same toolchain) auto-links any *_GOOS_GOARCH.syso
 // file found in the main package directory, so the result is a single .exe
 // with icon/manifest/version info baked in — no side-car files, no console
-// window. This mirrors how Wails packages Windows builds.
+// window.
 func writeWindowsResource(workDir string, target buildTarget, appID, appIcon, appTitle, appVersion string) (string, error) {
 	icoPath := filepath.Join(workDir, "app.ico")
 	if err := prepareWindowsIcon(icoPath, appIcon); err != nil {
@@ -700,7 +700,7 @@ func collectMissingBuildRequirements(targets []buildTarget) []missingRequirement
 				add(target, "macOS SDK/Xcode", "darwin targets require a macOS host with Xcode Command Line Tools in this build script")
 				continue
 			}
-			for _, tool := range []string{"xcrun", "sips", "iconutil"} {
+			for _, tool := range []string{"xcrun", "sips", "iconutil", "codesign"} {
 				if _, err := exec.LookPath(tool); err != nil {
 					add(target, tool, "install Xcode Command Line Tools with: xcode-select --install")
 				}
@@ -858,6 +858,17 @@ func packageDarwinApp(binaryPath, appTitle, appID, appIcon, appVersion, appBuild
 	}
 	if err := writeDarwinIcon(resDir, appIcon); err != nil {
 		fmt.Printf("→ app icon skipped: %v\n", err)
+	}
+	// Same reasoning as dev.go's runDarwinDevApp(): `open`/Launch Services (and
+	// Gatekeeper's first-launch check) validate the .app bundle as a unit, and
+	// a go build output copied into Contents/MacOS has no bundle-level
+	// signature on its own — an unsigned bundle can fail to open outright.
+	// A free ad-hoc "-" signature fixes local/CI-built bundles that haven't
+	// crossed a quarantine boundary; it does NOT satisfy Gatekeeper for a
+	// bundle downloaded from the internet (quarantined) — that still needs a
+	// real Developer ID signature + notarization, out of scope here.
+	if err := runCmd(".", nil, "codesign", "--force", "--deep", "--sign", "-", appPath); err != nil {
+		return fmt.Errorf("ad-hoc signing %s: %w", appPath, err)
 	}
 	fmt.Printf("→ packaged %s\n", appPath)
 	return nil

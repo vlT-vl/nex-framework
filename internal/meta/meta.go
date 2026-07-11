@@ -12,8 +12,8 @@ const Name = "nex"
 
 var (
 	Version = "0.1.0"
-	Build   = "R070726"
-	Updated = "7 Luglio 2026"
+	Build   = "R110726"
+	Updated = "11 Luglio 2026"
 	Author  = "© 2026 vlT di Veronesi Lorenzo"
 
 	// GoVersion, ZenityVersion and WebviewVersion are set at build time via

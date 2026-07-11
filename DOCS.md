@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0--R070726-blue?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-0.1.0--R110726-blue?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/go-1.26.4-00ADD8?style=flat-square&logo=go" alt="go"/>
   <img src="https://img.shields.io/badge/react-19.2.7-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react"/>
   <img src="https://img.shields.io/badge/react--icons-5.7.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react-icons"/>
@@ -100,6 +100,7 @@ duplicated in UI code: React, React Icons, and Vite come from
 | garble | installed automatically by `build.go` when missing |
 | C compiler | required by cgo/webview bindings |
 | pkg-config | required for Linux WebKitGTK builds |
+| codesign | required on macOS hosts (bundled with Xcode Command Line Tools) — ad-hoc signs every `.app` bundle `dev.go`/`build.go` produce, see [macOS](#macos) |
 
 Vite 8 requires Node `^20.19.0` or `>=22.12.0`; older Node 18 runtimes are no
 longer supported by the frontend toolchain.
@@ -114,6 +115,21 @@ The macOS targets are always built as both `darwin/amd64` and `darwin/arm64`.
 When the build runs on macOS, nex produces macOS `amd64`, macOS `arm64`, and
 Windows `amd64` artifacts. Linux is intentionally not built from macOS; the
 Linux release must be produced from a Linux build host.
+
+`codesign` (bundled with Xcode Command Line Tools, alongside `xcrun`/`sips`/
+`iconutil`) is required on macOS hosts, for both `dev.go` and `build.go`: every
+`.app` bundle they produce is ad-hoc signed (`codesign --force --deep --sign -
+<bundle>`) right after assembly. `open`/Launch Services validates a `.app`
+bundle as a unit — a bundle with a `go build` binary just copied into
+`Contents/MacOS` has no bundle-level signature on its own, and `open` can
+reject it outright with `_LSOpenURLsWithCompletionHandler() failed with error
+-54`, even though the binary itself runs fine when executed directly. The
+free ad-hoc `-` identity (no Apple Developer account, no entitlements) is
+enough to satisfy Launch Services for a local/CI-built bundle that has not
+crossed a quarantine boundary; it does **not** satisfy Gatekeeper for a bundle
+downloaded from the internet (quarantined) — that still needs a real
+Developer ID signature and notarization, which is out of scope for this
+framework's dev/build tooling.
 
 ### Linux (Debian/Ubuntu)
 
@@ -442,6 +458,8 @@ ports and native webview path. On macOS it runs through a temporary
 `<Title>-dev.app` bundle so the dock/app switcher uses the app `Icon`, `Title`,
 and `SingleInstanceID` resolved from `.env` through `main.go`; Windows and Linux use the native webview
 runtime directly during dev and keep the same frontend favicon/brand assets.
+The macOS bundle is rebuilt from scratch and ad-hoc signed on every `go run
+dev.go`/`make dev` (see [Requirements → macOS](#macos)) before being opened.
 
 ---
 
@@ -468,7 +486,7 @@ back to `res/nexicon.svg`. `NEX_APP_ID` drives the single-instance id and
 platform bundle/application identifiers, with a title slug as fallback.
 `NEX_APP_VERSION` and `NEX_APP_BUILD` drive release folder naming; the app
 version comes exclusively from `.env`. Every build writes into
-`release/<version>-<build>/`, for example `release/0.1.0-R070726/`.
+`release/<version>-<build>/`, for example `release/0.1.0-R110726/`.
 
 One `go run build.go build` / `make build` run builds every target supported
 by the current host:
@@ -522,9 +540,9 @@ After the binary is built, `build.go` runs a platform packaging step:
 
 | OS | Packaging output |
 |---|---|
-| macOS | `release/<version>-<build>/darwin-<arch>/<Title>.app`, with `.env` app identity in `Info.plist` and `Icon` converted to `nex.icns` |
+| macOS | `release/<version>-<build>/darwin-<arch>/<Title>.app`, with `.env` app identity in `Info.plist`, `Icon` converted to `nex.icns`, and the finished bundle ad-hoc signed (`codesign --force --deep --sign -`) |
 | Linux | `release/<version>-<build>/linux-<arch>/<app-id>/` with binary, desktop file, and the configured `Icon` installed under hicolor icons |
-| Windows | `release/<version>-<build>/windows-<arch>/<Title>.exe` — a single self-contained file. The `Icon` (rasterized to a multi-resolution `.ico` via `sips` on macOS or ImageMagick elsewhere), a Common-Controls v6 manifest, and version info are compiled with `windres` into a `.syso` that Go links in automatically, then deleted. No side-car icon/manifest files. The binary is always linked with `-H windowsgui` (both `build` and `release`), so it never opens a console window — matching the result a framework like Wails produces. |
+| Windows | `release/<version>-<build>/windows-<arch>/<Title>.exe` — a single self-contained file. The `Icon` (rasterized to a multi-resolution `.ico` via `sips` on macOS or ImageMagick elsewhere), a Common-Controls v6 manifest, and version info are compiled with `windres` into a `.syso` that Go links in automatically, then deleted. No side-car icon/manifest files. The binary is always linked with `-H windowsgui` (both `build` and `release`), so it never opens a console window. |
 
 For diagnostics only, `--plain` skips garble:
 
@@ -555,8 +573,8 @@ process environment values.
 # App identity. These values belong to the app, not to the nex framework.
 NEX_APP_NAME=nex-app-template
 NEX_APP_VERSION=0.1.0
-NEX_APP_BUILD=R070726
-NEX_APP_UPDATED=7 Luglio 2026
+NEX_APP_BUILD=R110726
+NEX_APP_UPDATED=11 Luglio 2026
 NEX_APP_AUTHOR=© 2026 vlT di Veronesi Lorenzo
 NEX_APP_ICON=res/nexicon.svg
 NEX_APP_ID=dev.vlt.nex-app-template

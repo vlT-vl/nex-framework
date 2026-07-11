@@ -29,6 +29,7 @@ import { NexLogo } from "./components/NexLogo.jsx";
 import frontendPkg from "../package.json";
 import docsMarkdown from "../../DOCS.md?raw";
 import licenseText from "../../LICENSE?raw";
+import nexMastheadSvg from "../../res/nex.svg?raw";
 
 function pkgVersion(name) {
   const version = frontendPkg.dependencies?.[name] ?? frontendPkg.devDependencies?.[name] ?? "…";
@@ -118,10 +119,19 @@ function StatusBar({ info, sess, beat, theme, themePreference, onThemeChange, on
 }
 
 function FileModal({ open, onClose, onLog, file, kicker, format = "markdown" }) {
-  const renderedContent = useMemo(
-    () => (format === "markdown" ? renderMarkdown(file.content) : null),
-    [file.content, format]
-  );
+  const renderedContent = useMemo(() => {
+    if (format !== "markdown") return null;
+    const html = renderMarkdown(file.content);
+    // The masthead <img src="res/nex.svg"> only tracks the OS-level
+    // prefers-color-scheme; it goes invisible when the in-app theme switch
+    // (data-theme) diverges from the OS setting (e.g. dark theme picked
+    // while the OS is in light mode). Inlining the SVG lets .docs-content's
+    // CSS override .wordmark's fill from data-theme instead.
+    return html.replace(
+      /<img[^>]*\bsrc="\/nex\.svg"[^>]*>/,
+      `<span class="masthead-logo">${nexMastheadSvg}</span>`
+    );
+  }, [file.content, format]);
   const contentRef = useRef(null);
   const titleId = `${file.title}-modal-title`;
 

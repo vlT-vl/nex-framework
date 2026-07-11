@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0--R070726-blue?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-0.1.0--R110726-blue?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/go-1.26.4-00ADD8?style=flat-square&logo=go" alt="go"/>
   <img src="https://img.shields.io/badge/react-19.2.7-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react"/>
   <img src="https://img.shields.io/badge/react--icons-5.7.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react-icons"/>
@@ -111,6 +111,10 @@ Default dev ports:
 
 Port `5173` is intentionally left free for standalone frontend projects.
 
+On macOS, dev mode runs through a temporary `.app` bundle that's ad-hoc
+code-signed (`codesign --sign -`) right after each build, before being
+launched — see [DOCS.md](DOCS.md#macos) for why.
+
 ---
 
 ## Build
@@ -148,7 +152,7 @@ release/<NEX_APP_VERSION>-<NEX_APP_BUILD>/
 Example:
 
 ```text
-release/0.1.0-R070726/
+release/0.1.0-R110726/
 ```
 
 Each target gets its own `<GOOS>-<GOARCH>/` subfolder holding a plain-named
@@ -168,8 +172,8 @@ Application metadata belongs to the app and is configured from `.env`.
 ```env
 NEX_APP_NAME=nex-app-template
 NEX_APP_VERSION=0.1.0
-NEX_APP_BUILD=R070726
-NEX_APP_UPDATED=7 Luglio 2026
+NEX_APP_BUILD=R110726
+NEX_APP_UPDATED=11 Luglio 2026
 NEX_APP_AUTHOR=© 2026 vlT di Veronesi Lorenzo
 NEX_APP_ICON=res/nexicon.svg
 NEX_APP_ID=dev.vlt.nex-app-template

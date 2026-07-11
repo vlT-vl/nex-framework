@@ -547,6 +547,27 @@ body {
 .docs-content > p[align="center"]:first-child img {
   max-width: 190px;
 }
+.docs-content .masthead-logo {
+  display: block;
+  max-width: 190px;
+  margin: 0 auto;
+}
+.docs-content .masthead-logo svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* The inlined masthead SVG ships its own `.wordmark` rule gated on
+   `@media (prefers-color-scheme: dark)` (needed for correct rendering on
+   GitHub). In-app the user can force a theme that diverges from the OS
+   setting via data-theme, so override it explicitly here — higher
+   specificity wins regardless of the OS media query. */
+:root[data-theme="dark"] .docs-content .masthead-logo .wordmark {
+  fill: #eceee8;
+}
+:root[data-theme="light"] .docs-content .masthead-logo .wordmark {
+  fill: #14181f;
+}
 .docs-content > h1:first-of-type {
   margin-top: 8px;
   font-family: var(--brand-font);

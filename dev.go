@@ -144,6 +144,18 @@ func runDarwinDevApp(appTitle, appID, appIcon string) error {
 	if err := runCmd(".", append([]string{"CGO_ENABLED=1"}, os.Environ()...), "go", "build", "-o", out, mainPkg); err != nil {
 		return err
 	}
+	// `open`/Launch Services validates the .app bundle as a unit (unlike
+	// running the binary directly from a shell, which bypasses this check
+	// entirely), and a bare `go build` output copied into Contents/MacOS has
+	// no bundle-level signature. An unsigned freshly-built bundle can make
+	// `open -W` fail outright with "_LSOpenURLsWithCompletionHandler() failed
+	// with error -54" even though the binary itself runs fine standalone — a
+	// free ad-hoc "-" signature (no Apple Developer account, no entitlements)
+	// is enough to satisfy Launch Services for a local, non-quarantined
+	// bundle like this one.
+	if err := runCmd(".", nil, "codesign", "--force", "--deep", "--sign", "-", appPath); err != nil {
+		return fmt.Errorf("ad-hoc signing dev app bundle: %w", err)
+	}
 	cmd := exec.Command("open", "-W", appPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
