@@ -1,9 +1,5 @@
 //go:build ignore
 
-// Development runner for nex.
-// Usage: go run dev.go
-//
-// Prepares Go modules, restarts Vite HMR, then runs the Go app with APP_DEV=1.
 package main
 
 import (
@@ -38,6 +34,8 @@ const (
 	apiPort     = "34115"
 	apiAddr     = viteHost + ":" + apiPort
 )
+
+const macOSMinimumSystemVersion = "14.0"
 
 var scriptEnvValues = map[string]string{}
 
@@ -86,7 +84,6 @@ func doDev() error {
 	cleanup := func() { once.Do(stopVite) }
 	defer cleanup()
 
-	// Kill Vite on SIGINT/SIGTERM even if the Go runtime skips defers on signal exit.
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -144,15 +141,7 @@ func runDarwinDevApp(appTitle, appID, appIcon string) error {
 	if err := runCmd(".", append([]string{"CGO_ENABLED=1"}, os.Environ()...), "go", "build", "-o", out, mainPkg); err != nil {
 		return err
 	}
-	// `open`/Launch Services validates the .app bundle as a unit (unlike
-	// running the binary directly from a shell, which bypasses this check
-	// entirely), and a bare `go build` output copied into Contents/MacOS has
-	// no bundle-level signature. An unsigned freshly-built bundle can make
-	// `open -W` fail outright with "_LSOpenURLsWithCompletionHandler() failed
-	// with error -54" even though the binary itself runs fine standalone — a
-	// free ad-hoc "-" signature (no Apple Developer account, no entitlements)
-	// is enough to satisfy Launch Services for a local, non-quarantined
-	// bundle like this one.
+
 	if err := runCmd(".", nil, "codesign", "--force", "--deep", "--sign", "-", appPath); err != nil {
 		return fmt.Errorf("ad-hoc signing dev app bundle: %w", err)
 	}
@@ -183,7 +172,9 @@ func writeDarwinInfoPlist(appPath, appTitle, executable string, env map[string]s
 	b.WriteString(plistEscape(executable))
 	b.WriteString(`</string>
   <key>CFBundleIconFile</key><string>nex</string>
-  <key>LSMinimumSystemVersion</key><string>10.13</string>
+  <key>LSMinimumSystemVersion</key><string>`)
+	b.WriteString(macOSMinimumSystemVersion)
+	b.WriteString(`</string>
   <key>LSEnvironment</key>
   <dict>
 `)
@@ -618,7 +609,7 @@ func nexViteReady(rawURL string) bool {
 	if err != nil {
 		return false
 	}
-	return strings.Contains(string(body), "nex client bridge")
+	return strings.Contains(string(body), "bridge_unavailable")
 }
 
 func portOpen(addr string) bool {

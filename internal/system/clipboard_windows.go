@@ -1,8 +1,5 @@
 //go:build windows
 
-// Package system: native Windows clipboard via the user32/kernel32 Win32
-// clipboard API, called through syscall.LazyDLL — pure Go stdlib, no cgo and
-// no shell subprocess (powershell Get-Clipboard/Set-Clipboard) is spawned.
 package system
 
 import (
@@ -34,9 +31,6 @@ const (
 	gmemMoveable  = 0x0002
 )
 
-// openClipboardRetry retries OpenClipboard briefly: the clipboard is a single
-// systemwide resource and can be transiently held by another process (e.g.
-// another app mid-copy) even outside of any real contention in this app.
 func openClipboardRetry() bool {
 	for attempt := 0; attempt < 10; attempt++ {
 		r, _, _ := procOpenClipboard.Call(0)
@@ -60,7 +54,7 @@ func nativeClipboardReadText() (string, bool, string, error) {
 
 	h, _, _ := procGetClipboardData.Call(uintptr(cfUnicodeText))
 	if h == 0 {
-		// No text on the clipboard — not an error.
+
 		return "", true, "user32", nil
 	}
 	p, _, _ := procGlobalLock.Call(h)
@@ -89,7 +83,7 @@ func nativeClipboardWriteText(text string) (bool, string, error) {
 	procEmptyClipboard.Call()
 
 	encoded := utf16.Encode([]rune(text))
-	encoded = append(encoded, 0) // null terminator
+	encoded = append(encoded, 0)
 
 	size := uintptr(len(encoded) * 2)
 	h, _, err := procGlobalAlloc.Call(gmemMoveable, size)
@@ -111,6 +105,6 @@ func nativeClipboardWriteText(text string) (bool, string, error) {
 		procGlobalFree.Call(h)
 		return false, "user32", err
 	}
-	// SetClipboardData succeeded: the system now owns h, do not free it.
+
 	return true, "user32", nil
 }

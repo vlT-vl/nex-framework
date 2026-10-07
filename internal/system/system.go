@@ -1,5 +1,3 @@
-// Package system registers all sys.* RPC handlers: dialogs, filesystem,
-// notifications, shell, window, OS info. Cross-platform via stdlib + zenity + exec.
 package system
 
 import (
@@ -48,7 +46,7 @@ type shortcutEntry struct {
 }
 
 func Register(reg core.Registrar) {
-	// OS info
+
 	reg.Register("sys.os.info", osInfo)
 	reg.Register("sys.os.host", osHost)
 	reg.Register("sys.os.user", osUser)
@@ -61,7 +59,6 @@ func Register(reg core.Registrar) {
 	reg.Register("sys.screen.info", screenInfo)
 	reg.Register("sys.env.paths", envPaths)
 
-	// Dialogs (must run on main thread via c.OnMain)
 	reg.Register("sys.dialog.open", dialogOpen)
 	reg.Register("sys.dialog.save", dialogSave)
 	reg.Register("sys.dialog.message", dialogMessage)
@@ -70,11 +67,9 @@ func Register(reg core.Registrar) {
 	reg.Register("sys.dialog.color", dialogColor)
 	reg.Register("sys.dialog.isSupported", dialogIsSupported)
 
-	// Notifications
 	reg.Register("sys.notify.toast", notifyToast)
 	reg.Register("sys.notify.capabilities", notifyCapabilities)
 
-	// Shell
 	reg.Register("sys.shell.openURL", shellOpenURL)
 	reg.Register("sys.shell.openPath", shellOpenPath)
 	reg.Register("sys.shell.showInFolder", shellShowInFolder)
@@ -82,7 +77,6 @@ func Register(reg core.Registrar) {
 	reg.Register("sys.shell.run", shellExec)
 	reg.Register("sys.shell.start", shellStart)
 
-	// Window (dispatched to main thread by App)
 	reg.Register("sys.window.info", windowInfo)
 	reg.Register("sys.window.setTitle", windowSetTitle)
 	reg.Register("sys.window.setSize", windowSetSize)
@@ -93,14 +87,12 @@ func Register(reg core.Registrar) {
 	reg.Register("sys.window.print", windowPrint)
 	reg.Register("sys.window.eval", windowEval)
 
-	// Clipboard
 	reg.Register("sys.clipboard.readText", clipboardReadText)
 	reg.Register("sys.clipboard.writeText", clipboardWriteText)
 	reg.Register("sys.clipboard.clear", clipboardClear)
 	reg.Register("sys.clipboard.formats", clipboardFormats)
 	reg.Register("sys.clipboard.isAvailable", clipboardIsAvailable)
 
-	// Logging
 	reg.Register("sys.log.print", logPrint)
 	reg.Register("sys.log.trace", logLevel("trace"))
 	reg.Register("sys.log.debug", logLevel("debug"))
@@ -108,7 +100,6 @@ func Register(reg core.Registrar) {
 	reg.Register("sys.log.warning", logLevel("warning"))
 	reg.Register("sys.log.error", logLevel("error"))
 
-	// Filesystem
 	reg.Register("sys.fs.read", fsRead)
 	reg.Register("sys.fs.write", fsWrite)
 	reg.Register("sys.fs.list", fsList)
@@ -118,7 +109,6 @@ func Register(reg core.Registrar) {
 	reg.Register("sys.fs.remove", fsRemove)
 	reg.Register("sys.fs.rename", fsRename)
 
-	// App
 	reg.Register("sys.app.quit", appQuit)
 	reg.Register("sys.app.exit", appExit)
 	reg.Register("sys.app.restart", appRestart)
@@ -127,7 +117,6 @@ func Register(reg core.Registrar) {
 	reg.Register("sys.menu.set", menuSet)
 	reg.Register("sys.menu.update", menuUpdate)
 
-	// Desktop integration surfaces with concrete runtime data.
 	reg.Register("sys.appearance.info", appearanceInfo)
 	reg.Register("sys.power.info", powerInfo)
 	reg.Register("sys.shortcuts.register", shortcutsRegister)
@@ -144,8 +133,6 @@ func Register(reg core.Registrar) {
 	reg.Register("sys.trash.empty", trashEmpty)
 }
 
-// ---- OS Info ----------------------------------------------------------------
-
 func osInfo(_ *core.Context, _ json.RawMessage) (any, error) {
 	host := hostInfo()
 	paths := pathsInfo()
@@ -161,7 +148,6 @@ func osInfo(_ *core.Context, _ json.RawMessage) (any, error) {
 		"time":        timeInfo(),
 		"environment": environmentInfo(),
 
-		// Kept for backward compatibility with the original compact response.
 		"os":       runtime.GOOS,
 		"arch":     runtime.GOARCH,
 		"home":     paths["home"],
@@ -202,10 +188,6 @@ func osTime(_ *core.Context, _ json.RawMessage) (any, error) {
 	return timeInfo(), nil
 }
 
-// screenInfo reports native monitor geometry via nativeScreenInfo, which is
-// implemented per platform (cgo CoreGraphics on darwin, cgo GDK on linux,
-// user32 EnumDisplayMonitors via syscall on windows) — no subprocess
-// (system_profiler/xrandr/wmic) is spawned.
 func screenInfo(_ *core.Context, _ json.RawMessage) (any, error) {
 	return map[string]any{
 		"platform": runtime.GOOS,
@@ -408,13 +390,6 @@ func memStatsMap(m runtime.MemStats) map[string]any {
 	}
 }
 
-// kernelInfo/platformInfo/cpuInfo/uptimeInfo/systemMemoryInfo/diskInfo all
-// delegate to nativeXxx, implemented per platform (cgo sysctlbyname on
-// darwin, syscall.LazyDLL on windows, /proc+syscall on linux — see
-// sysinfo_darwin.go/sysinfo_windows.go/sysinfo_linux.go). No subprocess
-// (uname/sysctl/sw_vers/vm_stat/df/wmic/cmd/reg/pmset/defaults CLIs) is
-// spawned by any of them.
-
 func kernelInfo() map[string]any {
 	return nativeKernelInfo()
 }
@@ -438,8 +413,6 @@ func uptimeInfo() map[string]any {
 func systemMemoryInfo() map[string]any {
 	return nativeMemoryInfo()
 }
-
-// ---- Dialogs ----------------------------------------------------------------
 
 type fileFilter struct {
 	Name     string   `json:"name"`
@@ -823,8 +796,7 @@ func dialogIsSupported(_ *core.Context, _ json.RawMessage) (any, error) {
 	case "windows":
 		method = "native"
 	default:
-		// zenity resolves: XDG portal > libzenity.so.0 > zenity binary.
-		// XDG portal requires D-Bus and is not probed here; check binary/lib as heuristic.
+
 		if _, err := exec.LookPath("zenity"); err == nil {
 			method = "zenity"
 		} else {
@@ -851,8 +823,6 @@ func dialogIsSupported(_ *core.Context, _ json.RawMessage) (any, error) {
 		"platform":  runtime.GOOS,
 	}, nil
 }
-
-// ---- Notifications ----------------------------------------------------------
 
 func notifyToast(c *core.Context, params json.RawMessage) (any, error) {
 	var p struct {
@@ -921,8 +891,6 @@ func notifyIcon(icon string) zenity.Option {
 		return zenity.Icon(icon)
 	}
 }
-
-// ---- Shell ------------------------------------------------------------------
 
 func shellOpenURL(c *core.Context, params json.RawMessage) (any, error) {
 	var p struct {
@@ -1103,12 +1071,6 @@ func nativeShellCommand(command string) (string, []string, string) {
 	return "/bin/sh", []string{"-lc", command}, "sh"
 }
 
-// openWithOS/showInFolderOS delegate to nativeOpenTarget/nativeRevealInFolder,
-// implemented per platform (NSWorkspace cgo on darwin, ShellExecuteW +
-// SHOpenFolderAndSelectItems via syscall on windows, GIO cgo on linux — see
-// launcher_darwin.go, launcher_windows.go, launcher_linux.go). No subprocess
-// (open/rundll32/explorer/xdg-open) is spawned by either.
-
 func openWithOS(target string) error {
 	return nativeOpenTarget(target)
 }
@@ -1116,8 +1078,6 @@ func openWithOS(target string) error {
 func showInFolderOS(path string) error {
 	return nativeRevealInFolder(path)
 }
-
-// ---- Window -----------------------------------------------------------------
 
 func windowInfo(c *core.Context, _ json.RawMessage) (any, error) {
 	return c.WindowInfo(), nil
@@ -1194,8 +1154,6 @@ func windowEval(c *core.Context, params json.RawMessage) (any, error) {
 	return map[string]any{"ok": true}, nil
 }
 
-// ---- Logging ----------------------------------------------------------------
-
 func logPrint(_ *core.Context, params json.RawMessage) (any, error) {
 	var p struct {
 		Message string `json:"message"`
@@ -1226,8 +1184,6 @@ func pBind(params json.RawMessage, v any) error {
 	}
 	return json.Unmarshal(params, v)
 }
-
-// ---- Filesystem -------------------------------------------------------------
 
 func fsRead(c *core.Context, params json.RawMessage) (any, error) {
 	var p struct {
@@ -1427,16 +1383,6 @@ func fsRename(c *core.Context, params json.RawMessage) (any, error) {
 	return map[string]any{"ok": true}, nil
 }
 
-// ---- Clipboard --------------------------------------------------------------
-//
-// Clipboard access is native per platform — no shell subprocess is spawned.
-// nativeClipboardReadText / nativeClipboardWriteText / nativeClipboardAvailable
-// are implemented in clipboard_darwin.go (cgo + NSPasteboard),
-// clipboard_windows.go (syscall + user32, no cgo), and clipboard_linux.go
-// (cgo + GTK, reusing the gtk+-3.0 linkage already required by webview_go's
-// GTK/WebKitGTK backend on Linux). Reads/writes are dispatched via c.OnMain
-// so they run on the same thread as the webview/GTK main loop.
-
 func clipboardReadText(c *core.Context, params json.RawMessage) (any, error) {
 	if err := c.Authorize(core.SecurityDecision{
 		Category: "clipboard", Operation: "readText", Params: params,
@@ -1528,8 +1474,6 @@ func clipboardIsAvailable(_ *core.Context, _ json.RawMessage) (any, error) {
 	}, nil
 }
 
-// ---- App --------------------------------------------------------------------
-
 func appQuit(c *core.Context, params json.RawMessage) (any, error) {
 	if err := c.Authorize(core.SecurityDecision{
 		Category: "app", Operation: "quit", Params: params,
@@ -1554,10 +1498,7 @@ func appExit(c *core.Context, params json.RawMessage) (any, error) {
 	}
 	go func(code int) {
 		time.Sleep(120 * time.Millisecond)
-		// os.Exit skips all deferred cleanup (including the deferred
-		// stopSingleInstance in App.Run), so release the single-instance
-		// lock explicitly here to avoid leaving a stale lock/secret file
-		// behind a hard exit.
+
 		c.ReleaseSingleInstance()
 		os.Exit(code)
 	}(p.Code)
@@ -1574,11 +1515,7 @@ func appRestart(c *core.Context, params json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, core.Errorf("app", "%v", err)
 	}
-	// Release the single-instance lock before spawning the replacement
-	// process. Without this, the new process can start (and probe the lock)
-	// before this one actually exits, find the port still held, decide it's
-	// a second instance, and quit immediately — the app appears to just
-	// close instead of restarting.
+
 	c.ReleaseSingleInstance()
 	cmd := exec.Command(exe, os.Args[1:]...)
 	cmd.Env = os.Environ()
@@ -1587,14 +1524,7 @@ func appRestart(c *core.Context, params json.RawMessage) (any, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, core.Errorf("app", "%v", err)
 	}
-	// Quit through the same path as sys.app.quit (wv.Terminate -> Run()
-	// returns -> OnShutdown -> main() returns) instead of a raw, timed
-	// os.Exit. A fixed sleep-then-kill never gave OnShutdown a chance to
-	// run at all, so any app-registered cleanup (e.g. explicitly tearing
-	// down native WKWebViews on macOS) was skipped on restart — leaving
-	// the WebKit-owned data-store process with no explicit signal to let
-	// go of its files before a caller (e.g. an import/restore flow) writes
-	// new ones to the same path out from under it.
+
 	c.Quit()
 	return map[string]any{"ok": true, "pid": cmd.Process.Pid, "executable": exe}, nil
 }
@@ -1617,8 +1547,6 @@ func appRuntime(_ *core.Context, _ json.RawMessage) (any, error) {
 		"arch":       runtime.GOARCH,
 	}, nil
 }
-
-// ---- Menu -------------------------------------------------------------------
 
 func menuSet(c *core.Context, params json.RawMessage) (any, error) {
 	if len(params) == 0 || string(params) == "null" {
@@ -1657,15 +1585,6 @@ func menuUpdate(c *core.Context, _ json.RawMessage) (any, error) {
 		"menu":     definition,
 	}, nil
 }
-
-// ---- Desktop integration ----------------------------------------------------
-
-// appearanceInfo/powerInfo delegate to nativeAppearanceInfo/nativePowerInfo,
-// implemented per platform (cgo NSUserDefaults/IOKit on darwin, registry/
-// GetSystemPowerStatus via syscall on windows, /proc+env on linux — see
-// appearance_darwin.go, power_darwin.go, sysinfo_windows.go,
-// sysinfo_linux.go). No subprocess (defaults/reg query/pmset/wmic) is
-// spawned by any of them.
 
 func appearanceInfo(_ *core.Context, _ json.RawMessage) (any, error) {
 	out := map[string]any{"platform": runtime.GOOS}
@@ -1806,7 +1725,7 @@ func updaterCheck(_ *core.Context, params json.RawMessage) (any, error) {
 	if err := pBind(params, &p); err != nil {
 		return nil, core.Errorf("bad_request", "%v", err)
 	}
-	// Backend env var takes precedence; frontend param accepted only as fallback.
+
 	if envURL := os.Getenv("NEX_UPDATE_URL"); envURL != "" {
 		p.URL = envURL
 	}
@@ -1827,7 +1746,7 @@ func updaterCheck(_ *core.Context, params json.RawMessage) (any, error) {
 	if p.URL == "" {
 		return out, nil
 	}
-	// Validate URL to prevent SSRF: require https and reject loopback/private hosts.
+
 	parsed, err := url.Parse(p.URL)
 	if err != nil {
 		return nil, core.Errorf("bad_request", "invalid update url: %v", err)
@@ -1866,7 +1785,7 @@ func updaterCheck(_ *core.Context, params json.RawMessage) (any, error) {
 		Notes     string `json:"notes"`
 		Mandatory bool   `json:"mandatory"`
 	}
-	// Limit response body to 512 KiB to prevent memory exhaustion.
+
 	if err := json.NewDecoder(io.LimitReader(res.Body, 512*1024)).Decode(&payload); err != nil {
 		return nil, core.Errorf("bad_response", "invalid update JSON: %v", err)
 	}
@@ -1934,14 +1853,6 @@ func fileAssociationsStatus(_ *core.Context, params json.RawMessage) (any, error
 	}, nil
 }
 
-// ---- Trash ------------------------------------------------------------------
-//
-// trashEmpty delegates to nativeEmptyTrash, implemented per platform (pure Go
-// on macOS/Linux — direct filesystem manipulation of the well-known trash
-// directories; syscall SHEmptyRecycleBinW on Windows, no cgo). No subprocess
-// (osascript/PowerShell Clear-RecycleBin/gio trash) is spawned by any of
-// them.
-
 func trashEmpty(c *core.Context, params json.RawMessage) (any, error) {
 	if err := c.Authorize(core.SecurityDecision{
 		Category: "filesystem", Operation: "trashEmpty", Params: params,
@@ -1959,11 +1870,6 @@ func trashEmpty(c *core.Context, params json.RawMessage) (any, error) {
 	return out, nil
 }
 
-// removeDirContents deletes every entry inside dir (not dir itself), best
-// effort: it keeps going on a per-entry error and returns the count actually
-// removed plus the first error encountered, if any. Shared by the macOS and
-// Linux native trash implementations, both of which just need "empty this
-// well-known folder".
 func removeDirContents(dir string) (int, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -2027,12 +1933,6 @@ func recentDocsList(_ *core.Context, _ json.RawMessage) (any, error) {
 	defer recentDocsMu.Unlock()
 	return map[string]any{"documents": loadRecentDocs()}, nil
 }
-
-// lookupProtocolHandler/lookupFileAssociation delegate to nativeProtocolStatus/
-// nativeFileAssociation, implemented per platform (own Info.plist read on
-// darwin, registry via syscall on windows, XDG mimeapps.list/globs parsing on
-// linux — see associations_darwin.go, sysinfo_windows.go, associations_linux.go).
-// No subprocess (reg query/xdg-mime) is spawned by any of them.
 
 func lookupProtocolHandler(scheme string) (bool, string, string) {
 	return nativeProtocolStatus(scheme)

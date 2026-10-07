@@ -10,22 +10,6 @@ package app
 #import <WebKit/WebKit.h>
 #import <objc/runtime.h>
 
-// webview_go's own WKUIDelegate ("WebviewWKUIDelegate", registered inside the
-// dependency at webview creation time) only implements the open-file-panel
-// method. It does NOT implement the three WKUIDelegate methods WebKit calls
-// for window.alert/confirm/prompt — and WKWebView's contract is that if the
-// delegate doesn't implement one of these, the JS call returns immediately
-// (confirm() as false, prompt() as null) WITHOUT ever showing anything. This
-// silently breaks any app.jsx-style `if (!window.confirm(...)) return` guard
-// in front of a privileged API call: every call reads as "cancelled" with no
-// dialog ever appearing.
-//
-// Fixed here by adding the three missing methods to the already-registered
-// delegate class at runtime via the Objective-C runtime (class_addMethod is
-// valid on a live, already-registered class — method dispatch is resolved
-// per-call from the class's method list, not fixed at instantiation time),
-// backed by a real modal NSAlert. No changes to the webview_go dependency
-// itself are needed or made.
 static void nexEnsureJSDialogSupport(void) {
     static BOOL installed = NO;
     if (installed) return;
@@ -81,12 +65,6 @@ static void nexEnsureJSDialogSupport(void) {
 */
 import "C"
 
-// ensureJSDialogSupport patches window.alert/confirm/prompt support into the
-// webview's own WKUIDelegate class (macOS only — GTK/WebView2 already show a
-// default dialog for these without any extra wiring). Must be called on the
-// main thread after webview.New() has created the delegate class (i.e. after
-// the webview instance exists), and is idempotent/safe to call more than
-// once.
 func ensureJSDialogSupport() {
 	C.nexEnsureJSDialogSupport()
 }

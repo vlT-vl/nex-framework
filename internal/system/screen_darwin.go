@@ -7,8 +7,6 @@ package system
 
 #include <CoreGraphics/CoreGraphics.h>
 
-// Enumerates active displays the same way `system_profiler SPDisplaysDataType`
-// does, directly via CoreGraphics — no subprocess spawned.
 static int nexDisplayList(int *xs, int *ys, int *ws, int *hs, int *isMain, int maxCount) {
     CGDirectDisplayID displays[32];
     uint32_t count = 0;
@@ -33,7 +31,6 @@ import "C"
 
 const maxNativeDisplays = 16
 
-// nativeScreenInfo replaces `system_profiler SPDisplaysDataType`.
 func nativeScreenInfo() []map[string]any {
 	var xs, ys, ws, hs, isMain [maxNativeDisplays]C.int
 	n := int(C.nexDisplayList(&xs[0], &ys[0], &ws[0], &hs[0], &isMain[0], C.int(maxNativeDisplays)))

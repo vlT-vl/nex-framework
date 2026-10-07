@@ -1,8 +1,5 @@
 //go:build darwin
 
-// Package system: native macOS clipboard via NSPasteboard (Cocoa), linked
-// with the same framework webview_go already requires on darwin — no shell
-// subprocess (pbcopy/pbpaste) is spawned.
 package system
 
 /*

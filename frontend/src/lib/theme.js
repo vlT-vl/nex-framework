@@ -10,9 +10,7 @@ export function getThemePreference() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (THEMES.has(saved)) return saved;
-  } catch {
-    // Storage can fail in restricted contexts; fall back to the OS.
-  }
+  } catch {}
   return "system";
 }
 
@@ -34,9 +32,7 @@ export function setThemePreference(preference) {
   const normalized = THEMES.has(preference) ? preference : "system";
   try {
     localStorage.setItem(STORAGE_KEY, normalized);
-  } catch {
-    // The applied document theme is still updated below.
-  }
+  } catch {}
   return applyTheme(normalized);
 }
 

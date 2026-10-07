@@ -1,8 +1,5 @@
 //go:build darwin
 
-// Package system: native macOS system/kernel/CPU/uptime/disk info via
-// sysctlbyname(3) (cgo) and getfsstat(2) (stdlib syscall) — no shell
-// subprocess (sw_vers/sysctl/uname/vm_stat/df CLIs) is spawned.
 package system
 
 /*
@@ -53,8 +50,6 @@ import (
 	"unsafe"
 )
 
-// mntNowait mirrors BSD's MNT_NOWAIT mount(2) flag (<sys/mount.h>), which the
-// syscall package does not export by name on darwin.
 const mntNowait = 2
 
 func sysctlString(name string) (string, bool) {
@@ -90,7 +85,6 @@ func bootTimeUnix() (int64, bool) {
 	return int64(v), ok != 0
 }
 
-// nativeKernelInfo replaces `uname -a` + `sysctl -n kern.osrelease/kern.version`.
 func nativeKernelInfo() map[string]any {
 	out := map[string]any{"sysname": "Darwin"}
 	if v, ok := sysctlString("kern.osrelease"); ok {
@@ -105,7 +99,6 @@ func nativeKernelInfo() map[string]any {
 	return out
 }
 
-// nativePlatformInfo replaces `sw_vers` + `sysctl -n hw.model`.
 func nativePlatformInfo() map[string]any {
 	out := map[string]any{"os": "darwin"}
 	if v, ok := sysctlString("kern.osproductversion"); ok {
@@ -117,7 +110,6 @@ func nativePlatformInfo() map[string]any {
 	return out
 }
 
-// nativeCPUInfo replaces `sysctl -n machdep.cpu.brand_string/hw.physicalcpu/hw.logicalcpu`.
 func nativeCPUInfo() map[string]any {
 	out := map[string]any{}
 	if v, ok := sysctlString("machdep.cpu.brand_string"); ok {
@@ -132,7 +124,6 @@ func nativeCPUInfo() map[string]any {
 	return out
 }
 
-// nativeUptimeInfo replaces `sysctl -n kern.boottime`.
 func nativeUptimeInfo() map[string]any {
 	out := map[string]any{}
 	if boot, ok := bootTimeUnix(); ok {
@@ -144,10 +135,6 @@ func nativeUptimeInfo() map[string]any {
 	return out
 }
 
-// nativeMemoryInfo replaces `sysctl -n hw.memsize` + `vm_stat`. Detailed page
-// statistics (free/active/inactive/wired) require the Mach host_statistics64
-// API and are intentionally left out here — only total physical memory
-// (unambiguously available via sysctlbyname) is reported.
 func nativeMemoryInfo() map[string]any {
 	out := map[string]any{}
 	if v, ok := sysctlInt64("hw.memsize"); ok {
@@ -156,9 +143,6 @@ func nativeMemoryInfo() map[string]any {
 	return out
 }
 
-// nativeDiskInfo replaces `df -kP` with the getfsstat(2) syscall (stdlib,
-// no cgo) — the same syscall `df`/`mount` use internally to enumerate
-// mounted filesystems.
 func nativeDiskInfo() []map[string]any {
 	n, err := syscall.Getfsstat(nil, mntNowait)
 	if err != nil || n <= 0 {

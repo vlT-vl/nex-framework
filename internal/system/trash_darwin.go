@@ -1,8 +1,5 @@
 //go:build darwin
 
-// Package system: native macOS trash emptying — direct filesystem
-// manipulation of the well-known trash directories (pure Go, no cgo, no
-// subprocess/AppleScript).
 package system
 
 import (
@@ -14,10 +11,6 @@ import (
 	"syscall"
 )
 
-// nativeEmptyTrash empties the current user's trash on the boot volume
-// (~/.Trash) plus, best-effort, the per-user trash on every other mounted
-// volume (<volume>/.Trashes/<uid>) — the same locations Finder's "Empty
-// Trash" clears. Returns the number of top-level items removed.
 func nativeEmptyTrash() (int, error) {
 	removed := 0
 	var errs []string
@@ -54,11 +47,6 @@ func nativeEmptyTrash() (int, error) {
 	return removed, nil
 }
 
-// macOSPermissionHint turns the bare EPERM/EACCES macOS returns for
-// TCC-protected folders (~/.Trash included, since Mojave-era privacy
-// protections) into an actionable message. There is no code-level
-// workaround: TCC access to protected user folders can only be granted by
-// the user, in System Settings — this isn't a bug in nativeEmptyTrash.
 func macOSPermissionHint(err error) string {
 	if errors.Is(err, syscall.EPERM) || errors.Is(err, syscall.EACCES) {
 		return err.Error() + " (macOS is blocking access to the trash folder for this app — " +

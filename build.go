@@ -1,18 +1,5 @@
 //go:build ignore
 
-// Build orchestrator for nex.
-// Usage: go run build.go [command] [flags]
-//
-//	build         (default) build frontend then all target binaries
-//	release       optimized build (-s -w, windowsgui on Windows targets)
-//	obfuscate     release + garble code obfuscation
-//	requirements  show and validate host requirements for selected targets
-//	doctor        alias for requirements
-//	clean         remove release/ and frontend/dist contents
-//
-// Flags:
-//
-//	--plain  skip garble and use go build directly
 package main
 
 import (
@@ -239,13 +226,6 @@ func modulePathFromGoMod() (string, error) {
 	return "", fmt.Errorf("go.mod module path not found")
 }
 
-// goModDependencyVersions parses go.mod's require block for dependency
-// versions, keyed by import path (e.g. "github.com/ncruces/zenity").
-// Read once at build time, when the working directory is reliably the
-// project root — unlike internal/meta.Stack()'s own runtime fallback, which
-// reads the same file relative to whatever the *packaged app's* working
-// directory happens to be (wrong for a double-clicked .app) and can also be
-// undermined by garble rewriting debug.ReadBuildInfo()'s dependency paths.
 func goModDependencyVersions() map[string]string {
 	out := map[string]string{}
 	b, err := os.ReadFile("go.mod")
@@ -262,7 +242,7 @@ func goModDependencyVersions() map[string]string {
 }
 
 func buildFrontend() error {
-	// npm install only if node_modules is missing
+
 	if _, err := os.Stat(filepath.Join(frontendDir, "node_modules")); os.IsNotExist(err) {
 		if err := runCmd(frontendDir, nil, "npm", "install"); err != nil {
 			return err
@@ -280,10 +260,7 @@ func buildTargets() []buildTarget {
 			{GOOS: "windows", GOARCH: "amd64"},
 		}
 	case "linux":
-		// Linux targets the host's own architecture (amd64 or arm64) rather
-		// than a hardcoded amd64: cross-arch cgo/GTK builds need a matching
-		// sysroot this script doesn't set up, so a Linux amd64/arm64 release
-		// is produced by running the build natively on that architecture.
+
 		return []buildTarget{
 			{GOOS: "linux", GOARCH: runtime.GOARCH},
 			{GOOS: "windows", GOARCH: "amd64"},
@@ -309,7 +286,7 @@ func doRequirements() error {
 	}
 	fmt.Println()
 	fmt.Println("expected host tools:")
-	fmt.Println("  - Go 1.26.4+")
+	fmt.Println("  - Go 1.27.1+")
 	fmt.Println("  - Node 20.19+ or 22.12+ with npm")
 	fmt.Println("  - garble on PATH, or network access for: go install mvdan.cc/garble@latest")
 	fmt.Println("  - cgo toolchains for every target selected for this host")
@@ -362,12 +339,7 @@ func buildTargetBinary(tmpDir, tool string, buildPrefix []string, target buildTa
 	if release {
 		ldParts = append(ldParts, "-s", "-w")
 	}
-	// Bake the actual toolchain/dependency versions in at build time — see
-	// internal/meta.GoVersion/ZenityVersion/WebviewVersion for why runtime
-	// introspection of these isn't reliable in a packaged app (garble
-	// blanks debug.ReadBuildInfo() to avoid leaking pre-obfuscation module
-	// paths, so the "Runtime" stack row in the About/Framework modal came
-	// back completely empty, not even "go").
+
 	if modulePath, err := modulePathFromGoMod(); err == nil {
 		ldParts = append(ldParts, "-X", modulePath+"/internal/meta.GoVersion="+strings.TrimPrefix(runtime.Version(), "go"))
 		deps := goModDependencyVersions()
@@ -379,7 +351,7 @@ func buildTargetBinary(tmpDir, tool string, buildPrefix []string, target buildTa
 		}
 	}
 	if target.GOOS == "windows" {
-		// GUI subsystem: no console window ever.
+
 		ldParts = append(ldParts, "-H", "windowsgui")
 		sysoName, err := writeWindowsResource(targetDir, target, appID, appIcon, appTitle, appVersion)
 		if err != nil {
@@ -404,11 +376,6 @@ func buildTargetBinary(tmpDir, tool string, buildPrefix []string, target buildTa
 	return out, nil
 }
 
-// macOSDeploymentTarget is the minimum macOS version the darwin binaries must
-// run on. Without this, clang/ld default to the deployment target of the SDK
-// installed on the build machine, so a binary built on a newer macOS host
-// silently refuses to launch on older ones (LaunchServices shows "you can't
-// use this version of the app with this version of macOS").
 const macOSDeploymentTarget = "14.0"
 
 func targetEnv(target buildTarget, garbleScope string) []string {
@@ -443,12 +410,6 @@ func targetEnv(target buildTarget, garbleScope string) []string {
 	return env
 }
 
-// writeWindowsResource embeds the app icon, version info and a Common-Controls
-// v6 manifest into a single .syso next to main.go. `go build` (and garble,
-// which shells out to the same toolchain) auto-links any *_GOOS_GOARCH.syso
-// file found in the main package directory, so the result is a single .exe
-// with icon/manifest/version info baked in — no side-car files, no console
-// window.
 func writeWindowsResource(workDir string, target buildTarget, appID, appIcon, appTitle, appVersion string) (string, error) {
 	icoPath := filepath.Join(workDir, "app.ico")
 	if err := prepareWindowsIcon(icoPath, appIcon); err != nil {
@@ -490,10 +451,6 @@ func windresPath(target buildTarget) (string, error) {
 	return "", fmt.Errorf("%s not found; install mingw-w64 (bundles windres) or set NEX_WINDRES_%s", name, key)
 }
 
-// prepareWindowsIcon produces a multi-resolution .ico. If appIcon is already
-// an .ico it's used as-is; otherwise it's rasterized at standard Windows
-// icon sizes and each size is embedded as a PNG frame (supported by Windows
-// Vista+ for any ICO frame size, so no BMP/DIB encoding is needed).
 func prepareWindowsIcon(icoPath, appIcon string) error {
 	if strings.EqualFold(filepath.Ext(appIcon), ".ico") {
 		return copyFile(appIcon, icoPath)
@@ -530,7 +487,6 @@ func rasterizeIconPNG(source, out string, size int) error {
 	}
 }
 
-// writeICO packs pre-encoded PNG frames into a valid ICO container.
 func writeICO(path string, sizes []int, pngs [][]byte) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -540,7 +496,7 @@ func writeICO(path string, sizes []int, pngs [][]byte) error {
 
 	n := len(sizes)
 	header := make([]byte, 6)
-	binary.LittleEndian.PutUint16(header[2:], 1) // type: icon
+	binary.LittleEndian.PutUint16(header[2:], 1)
 	binary.LittleEndian.PutUint16(header[4:], uint16(n))
 	if _, err := f.Write(header); err != nil {
 		return err
@@ -551,12 +507,12 @@ func writeICO(path string, sizes []int, pngs [][]byte) error {
 		entry := make([]byte, 16)
 		dim := byte(size)
 		if size >= 256 {
-			dim = 0 // 0 means 256 per the ICO spec
+			dim = 0
 		}
 		entry[0] = dim
 		entry[1] = dim
-		binary.LittleEndian.PutUint16(entry[4:], 1)  // color planes
-		binary.LittleEndian.PutUint16(entry[6:], 32) // bits per pixel
+		binary.LittleEndian.PutUint16(entry[4:], 1)
+		binary.LittleEndian.PutUint16(entry[6:], 32)
 		binary.LittleEndian.PutUint32(entry[8:], uint32(len(pngs[i])))
 		binary.LittleEndian.PutUint32(entry[12:], uint32(offset))
 		offset += len(pngs[i])
@@ -748,10 +704,7 @@ func checkPath(target buildTarget, name, hint string, add func(buildTarget, stri
 }
 
 func pkgConfigHasLinuxWebviewPackages(target buildTarget, pkgConfig string) bool {
-	// gio-2.0 backs internal/system/launcher_linux.go (native open/reveal-in-
-	// folder); it's a transitive dependency of gtk+-3.0 on every distro that
-	// ships libgtk-3-dev, but checked explicitly here since it's a distinct
-	// pkg-config module.
+
 	cmd := exec.Command(pkgConfig, "--exists", "gtk+-3.0", "webkit2gtk-4.0", "gio-2.0")
 	cmd.Env = append(os.Environ(), pkgConfigEnvForTarget(target)...)
 	return cmd.Run() == nil
@@ -824,8 +777,6 @@ func packagePlatformApp(binaryPath, appTitle, appID, appIcon, appVersion, appBui
 	}
 }
 
-// targetOutDir isolates each GOOS/GOARCH combination in its own directory so
-// the packaged app/binary itself keeps a clean, non-composite app name.
 func targetOutDir(target buildTarget) string {
 	return filepath.Join(outDir, target.GOOS+"-"+target.GOARCH)
 }
@@ -859,14 +810,7 @@ func packageDarwinApp(binaryPath, appTitle, appID, appIcon, appVersion, appBuild
 	if err := writeDarwinIcon(resDir, appIcon); err != nil {
 		fmt.Printf("→ app icon skipped: %v\n", err)
 	}
-	// Same reasoning as dev.go's runDarwinDevApp(): `open`/Launch Services (and
-	// Gatekeeper's first-launch check) validate the .app bundle as a unit, and
-	// a go build output copied into Contents/MacOS has no bundle-level
-	// signature on its own — an unsigned bundle can fail to open outright.
-	// A free ad-hoc "-" signature fixes local/CI-built bundles that haven't
-	// crossed a quarantine boundary; it does NOT satisfy Gatekeeper for a
-	// bundle downloaded from the internet (quarantined) — that still needs a
-	// real Developer ID signature + notarization, out of scope here.
+
 	if err := runCmd(".", nil, "codesign", "--force", "--deep", "--sign", "-", appPath); err != nil {
 		return fmt.Errorf("ad-hoc signing %s: %w", appPath, err)
 	}
@@ -918,9 +862,6 @@ Categories=Development;
 	return nil
 }
 
-// packageWindowsApp produces a single self-contained .exe — icon, version
-// info and manifest are already embedded at compile time by
-// writeWindowsResource, so there is nothing else to place next to it.
 func packageWindowsApp(binaryPath, appTitle string, target buildTarget) error {
 	targetDir := targetOutDir(target)
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
@@ -946,10 +887,10 @@ func writeDarwinInfoPlist(appPath, appTitle, executable, appVersion, appBuild st
   <key>CFBundleShortVersionString</key><string>%s</string>
   <key>CFBundleExecutable</key><string>%s</string>
   <key>CFBundleIconFile</key><string>nex</string>
-  <key>LSMinimumSystemVersion</key><string>10.13</string>
+  <key>LSMinimumSystemVersion</key><string>%s</string>
 </dict>
 </plist>
-`, plistEscape(appTitle), plistEscape(appTitle), plistEscape(executable), plistEscape(appBuild), plistEscape(appVersion), plistEscape(executable))
+`, plistEscape(appTitle), plistEscape(appTitle), plistEscape(executable), plistEscape(appBuild), plistEscape(appVersion), plistEscape(executable), macOSDeploymentTarget)
 	return os.WriteFile(filepath.Join(appPath, "Contents", "Info.plist"), []byte(plist), 0o644)
 }
 
@@ -1273,7 +1214,7 @@ func copyFile(src, dst string) error {
 
 func doClean() error {
 	_ = os.RemoveAll(releaseRoot)
-	// Remove dist contents but keep dist/index.html placeholder
+
 	entries, _ := os.ReadDir(filepath.Join(frontendDir, "dist"))
 	placeholder := []string{"index.html"}
 	for _, e := range entries {

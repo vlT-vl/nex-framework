@@ -10,8 +10,6 @@ package system
 #include <stdlib.h>
 #include <string.h>
 
-// Reads the same NSUserDefaults key the `defaults read -g AppleInterfaceStyle`
-// CLI reads, directly via Cocoa — no subprocess spawned.
 static char *nexAppearanceStyle(void) {
     @autoreleasepool {
         NSString *style = [[NSUserDefaults standardUserDefaults] stringForKey:@"AppleInterfaceStyle"];
@@ -32,9 +30,6 @@ import (
 	"unsafe"
 )
 
-// nativeAppearanceInfo replaces `defaults read -g AppleInterfaceStyle`.
-// macOS only sets the key at all in dark mode, so a NULL/empty read means
-// light mode (matching the CLI's own convention).
 func nativeAppearanceInfo() map[string]any {
 	const source = "NSUserDefaults AppleInterfaceStyle"
 	cstr := C.nexAppearanceStyle()

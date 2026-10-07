@@ -56,7 +56,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── topbar ── */
 .topbar {
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; gap: 16px;
@@ -148,7 +147,6 @@ body {
 }
 @media (prefers-reduced-motion: reduce) { .dot.beat { animation: none; } }
 
-/* ── layout ── */
 .wrap { max-width: 1160px; margin: 0 auto; padding: 24px 24px 240px; }
 .section { margin-top: 28px; }
 .nex-logo {
@@ -301,7 +299,6 @@ body {
   white-space: nowrap;
 }
 
-/* ── panel ── */
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -309,7 +306,6 @@ body {
   overflow: hidden;
 }
 
-/* key/value grid */
 .kv { display: grid; grid-template-columns: minmax(165px, .18fr) minmax(0, 1fr); }
 .kv > div {
   min-height: 39px;
@@ -327,7 +323,6 @@ body {
   letter-spacing: .02em;
 }
 
-/* env grid */
 .env-grid { padding: 4px 14px 10px; }
 .env-row {
   display: flex; gap: 12px; padding: 5px 0;
@@ -339,7 +334,6 @@ body {
 .env-val { color: var(--ink); word-break: break-all; }
 .note { color: var(--muted); font-size: 12px; padding: 0 14px 10px; }
 
-/* ── api explorer ── */
 .group { border-top: 1px solid var(--line); }
 .group:first-child { border-top: none; }
 .group-head {
@@ -398,7 +392,6 @@ body {
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn:disabled { opacity: .4; cursor: default; }
 
-/* ── docs modal ── */
 .modal-layer {
   position: fixed;
   inset: 0;
@@ -557,11 +550,6 @@ body {
   width: 100%;
   height: auto;
 }
-/* The inlined masthead SVG ships its own `.wordmark` rule gated on
-   `@media (prefers-color-scheme: dark)` (needed for correct rendering on
-   GitHub). In-app the user can force a theme that diverges from the OS
-   setting via data-theme, so override it explicitly here — higher
-   specificity wins regardless of the OS media query. */
 :root[data-theme="dark"] .docs-content .masthead-logo .wordmark {
   fill: #eceee8;
 }
@@ -699,7 +687,6 @@ body {
   height: 20px;
 }
 
-/* ── terminal console ── */
 .console-dock {
   position: fixed;
   left: 50%;

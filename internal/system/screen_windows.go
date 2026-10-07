@@ -45,11 +45,9 @@ func monitorEnumProc(hMonitor, _hdcMonitor uintptr, lprcMonitor uintptr, _dwData
 		"height":  int(r.bottom - r.top),
 		"primary": primary,
 	})
-	return 1 // continue enumeration
+	return 1
 }
 
-// nativeScreenInfo replaces
-// `wmic desktopmonitor get Name,ScreenWidth,ScreenHeight`.
 func nativeScreenInfo() []map[string]any {
 	screenMu.Lock()
 	defer screenMu.Unlock()

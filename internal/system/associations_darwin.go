@@ -8,11 +8,6 @@ import (
 	"strings"
 )
 
-// nativeProtocolStatus/nativeFileAssociation read the app's own Info.plist
-// (already pure Go, no subprocess) for URL scheme / document type
-// registrations — unchanged from before this file existed, just extracted
-// here to match the per-platform nativeXxx naming used across the package.
-
 func nativeProtocolStatus(scheme string) (bool, string, string) {
 	plist := currentBundleInfoPlist()
 	if plist == "" {

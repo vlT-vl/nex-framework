@@ -1,10 +1,5 @@
 //go:build linux
 
-// Package system: the parts of Linux system info that still needed a
-// subprocess (`uname -a`, `df -kP`) rewritten as pure Go stdlib (syscall.Uname,
-// /proc/self/mountinfo + syscall.Statfs). CPU/memory/power/appearance info on
-// Linux already came from /proc, /sys and env vars with no subprocess
-// involved (see system.go) and are unchanged.
 package system
 
 import (
@@ -16,7 +11,6 @@ import (
 	"time"
 )
 
-// nativeKernelInfo replaces `uname -a`.
 func nativeKernelInfo() map[string]any {
 	var uts syscall.Utsname
 	if err := syscall.Uname(&uts); err != nil {
@@ -42,9 +36,6 @@ func int8sToString(b []int8) string {
 	return string(buf)
 }
 
-// nativeDiskInfo replaces `df -kP` with /proc/self/mountinfo (to enumerate
-// mount points, pure file read) + the statfs(2) syscall (stdlib, no cgo) per
-// mount, the same pair of primitives `df` itself uses internally.
 func nativeDiskInfo() []map[string]any {
 	mounts := parseMountinfo("/proc/self/mountinfo")
 	out := make([]map[string]any, 0, len(mounts))
@@ -78,9 +69,6 @@ type mountEntry struct {
 	source     string
 }
 
-// parseMountinfo reads the mountinfo(5) format documented in proc(5): fields
-// are whitespace-separated up to a literal "-" separator, after which the
-// filesystem type and source device are the next two fields.
 func parseMountinfo(path string) []mountEntry {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -101,8 +89,7 @@ func parseMountinfo(path string) []mountEntry {
 		}
 		mountPoint := unescapeMountinfo(fields[4])
 		source := unescapeMountinfo(fields[sepIdx+2])
-		// Skip common virtual/pseudo filesystems that never carry real
-		// usable capacity, matching what `df` normally excludes by default.
+
 		fsType := fields[sepIdx+1]
 		switch fsType {
 		case "proc", "sysfs", "cgroup", "cgroup2", "devtmpfs", "devpts", "tmpfs",
@@ -115,8 +102,6 @@ func parseMountinfo(path string) []mountEntry {
 	return out
 }
 
-// unescapeMountinfo decodes the octal escapes (\040 for space, etc.) mountinfo
-// uses for paths/devices containing whitespace.
 func unescapeMountinfo(s string) string {
 	if !strings.Contains(s, "\\") {
 		return s
@@ -137,8 +122,6 @@ func unescapeMountinfo(s string) string {
 	return b.String()
 }
 
-// readKeyValueFile parses simple "key<sep>value" files such as
-// /etc/os-release, /proc/cpuinfo and /proc/meminfo.
 func readKeyValueFile(path, sep string) map[string]string {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -159,9 +142,6 @@ func readKeyValueFile(path, sep string) map[string]string {
 	return out
 }
 
-// nativePlatformInfo replaces `sw_vers`/`wmic os get Caption,...` on their
-// respective platforms; on Linux, distro identity was always available from
-// /etc/os-release (no subprocess involved).
 func nativePlatformInfo() map[string]any {
 	out := map[string]any{"os": "linux"}
 	for k, v := range readKeyValueFile("/etc/os-release", "=") {
@@ -170,9 +150,6 @@ func nativePlatformInfo() map[string]any {
 	return out
 }
 
-// nativeCPUInfo replaces `sysctl`/`wmic cpu get ...` on their respective
-// platforms; on Linux, CPU model/core count were always available from
-// /proc/cpuinfo (no subprocess involved).
 func nativeCPUInfo() map[string]any {
 	out := map[string]any{}
 	cpu := readKeyValueFile("/proc/cpuinfo", ":")
@@ -185,9 +162,6 @@ func nativeCPUInfo() map[string]any {
 	return out
 }
 
-// nativeUptimeInfo replaces `sysctl -n kern.boottime`/`wmic os get
-// LastBootUpTime` on their respective platforms; on Linux, uptime was always
-// available from /proc/uptime (no subprocess involved).
 func nativeUptimeInfo() map[string]any {
 	out := map[string]any{}
 	b, err := os.ReadFile("/proc/uptime")
@@ -207,9 +181,6 @@ func nativeUptimeInfo() map[string]any {
 	return out
 }
 
-// nativeMemoryInfo replaces `sysctl -n hw.memsize`+`vm_stat`/`wmic OS get
-// Free.../Total...` on their respective platforms; on Linux, memory stats
-// were always available from /proc/meminfo (no subprocess involved).
 func nativeMemoryInfo() map[string]any {
 	out := map[string]any{}
 	for k, v := range readKeyValueFile("/proc/meminfo", ":") {
@@ -230,11 +201,6 @@ func nativeMemoryInfo() map[string]any {
 	return out
 }
 
-// nativeAppearanceInfo replaces `defaults read`/`reg query` on their
-// respective platforms; on Linux there is no single system-wide dark-mode
-// API without a desktop-portal round trip, so this reports the same
-// GTK_THEME environment heuristic already used before (no subprocess
-// involved either way).
 func nativeAppearanceInfo() map[string]any {
 	out := map[string]any{"theme": "unknown", "source": "environment"}
 	if gtk := os.Getenv("GTK_THEME"); gtk != "" {
@@ -248,9 +214,6 @@ func nativeAppearanceInfo() map[string]any {
 	return out
 }
 
-// nativePowerInfo replaces `pmset -g batt`/`wmic path Win32_Battery get ...`
-// on their respective platforms; on Linux, battery/power-supply info was
-// always available from /sys/class/power_supply (no subprocess involved).
 func nativePowerInfo() map[string]any {
 	supplies, _ := filepath.Glob("/sys/class/power_supply/*")
 	items := []map[string]any{}

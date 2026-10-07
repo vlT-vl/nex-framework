@@ -1,14 +1,5 @@
 //go:build linux
 
-// Package system: native Linux "open with default app" / "reveal in file
-// manager" via GIO (part of GLib, already a transitive dependency of the
-// gtk+-3.0 linkage webview_go requires) — no `xdg-open` subprocess is
-// spawned. Reveal-in-folder uses the freedesktop.org FileManager1 D-Bus
-// service (implemented by Nautilus/Dolphin/Nemo/etc.), which messages the
-// already-running file manager instead of launching a new one; if that
-// service isn't available, it falls back to opening the containing
-// directory with the default handler, still via GIO (no subprocess either
-// way).
 package system
 
 /*
@@ -64,9 +55,6 @@ import (
 	"unsafe"
 )
 
-// nativeOpenTarget replaces `xdg-open <target>` for both URLs and plain
-// filesystem paths (a bare path is converted to a file:// URI first, since
-// g_app_info_launch_default_for_uri requires a URI).
 func nativeOpenTarget(target string) error {
 	uri := target
 	if !looksLikeURI(target) {
@@ -84,12 +72,6 @@ func nativeOpenTarget(target string) error {
 	return nil
 }
 
-// nativeRevealInFolder replaces `xdg-open <parent-dir>` (the previous
-// best-effort fallback, since there's no `open -R` equivalent CLI on Linux):
-// it now asks the running file manager to select the item via the
-// freedesktop.org FileManager1 D-Bus service, falling back to opening the
-// containing directory (still via GIO, no subprocess) if that service isn't
-// registered on the session bus.
 func nativeRevealInFolder(path string) error {
 	abs, err := filepath.Abs(path)
 	if err != nil {

@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="res/nex.svg" alt="nex" width="150" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="res/nex-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="res/nex-light.svg">
+    <img src="res/nex-light.svg" alt="nex" width="150">
+  </picture>
 </p>
 
 <p align="center">
@@ -8,11 +12,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0--R110726-blue?style=flat-square" alt="version"/>
-  <img src="https://img.shields.io/badge/go-1.26.4-00ADD8?style=flat-square&logo=go" alt="go"/>
-  <img src="https://img.shields.io/badge/react-19.2.7-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react"/>
+  <img src="https://img.shields.io/badge/version-0.1.1--R071026-blue?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/go-1.27.1-00ADD8?style=flat-square&logo=go" alt="go"/>
+  <img src="https://img.shields.io/badge/react-19.3.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react"/>
   <img src="https://img.shields.io/badge/react--icons-5.7.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react-icons"/>
-  <img src="https://img.shields.io/badge/vite-8.1.3-646CFF?style=flat-square&logo=vite&logoColor=white" alt="vite"/>
+  <img src="https://img.shields.io/badge/vite-8.3.2-646CFF?style=flat-square&logo=vite&logoColor=white" alt="vite"/>
   <img src="https://img.shields.io/badge/license-proprietary-critical?style=flat-square" alt="license"/>
 </p>
 
@@ -60,7 +64,7 @@ come from `framework.stack()`.
 
 | Tool | Version / note |
 |---|---|
-| Go | 1.26.4+ |
+| Go | 1.27.1+ |
 | Node | 20.19+ or 22.12+ with npm |
 | C compiler | Required by cgo/webview bindings |
 | garble | Installed automatically by `build.go` when missing |
@@ -115,6 +119,10 @@ On macOS, dev mode runs through a temporary `.app` bundle that's ad-hoc
 code-signed (`codesign --sign -`) right after each build, before being
 launched — see [DOCS.md](DOCS.md#macos) for why.
 
+Release builds target macOS 14 (Sonoma) as the minimum deployment version,
+covering the last four annual macOS releases — Sonoma (14), Sequoia (15),
+Tahoe (26), and Golden Gate (27) — see [DOCS.md](DOCS.md#macos).
+
 ---
 
 ## Build
@@ -152,7 +160,7 @@ release/<NEX_APP_VERSION>-<NEX_APP_BUILD>/
 Example:
 
 ```text
-release/0.1.0-R110726/
+release/0.1.1-R071026/
 ```
 
 Each target gets its own `<GOOS>-<GOARCH>/` subfolder holding a plain-named
@@ -171,9 +179,9 @@ Application metadata belongs to the app and is configured from `.env`.
 
 ```env
 NEX_APP_NAME=nex-app-template
-NEX_APP_VERSION=0.1.0
-NEX_APP_BUILD=R110726
-NEX_APP_UPDATED=11 Luglio 2026
+NEX_APP_VERSION=0.1.1
+NEX_APP_BUILD=R071026
+NEX_APP_UPDATED=7 Ottobre 2026
 NEX_APP_AUTHOR=© 2026 vlT di Veronesi Lorenzo
 NEX_APP_ICON=res/nexicon.svg
 NEX_APP_ID=dev.vlt.nex-app-template
@@ -200,7 +208,7 @@ missing from the file.
 Framework metadata is separate and available from:
 
 ```js
-const fw = await framework.info(); // { id: "nex@0.1.0", ... }
+const fw = await framework.info(); // { id: "nex@0.1.1", ... }
 ```
 
 `app.info()` and `framework.info()` are separate API calls: app metadata comes
@@ -288,6 +296,7 @@ Detailed architecture and flow diagrams are in [DOCS.md](DOCS.md#project-structu
 |---|---|
 | [README.md](README.md) | Quick project entry point |
 | [DOCS.md](DOCS.md) | Complete framework architecture, build, security, and API reference |
+| [CHANGELOG.md](CHANGELOG.md) | Version/build history |
 | [LICENSE](LICENSE) | Source-available license terms |
 
 ---

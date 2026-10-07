@@ -1,9 +1,5 @@
 //go:build linux
 
-// Package system: native Linux monitor enumeration via GDK, reusing the
-// gtk+-3.0 linkage already required by webview_go's GTK/WebKitGTK backend —
-// no subprocess (`xrandr --listmonitors`) is spawned. GDK's monitor API is
-// backend agnostic (X11 and Wayland both go through GdkDisplay).
 package system
 
 /*
@@ -37,7 +33,6 @@ import "C"
 
 const maxNativeDisplays = 16
 
-// nativeScreenInfo replaces `xrandr --listmonitors`.
 func nativeScreenInfo() []map[string]any {
 	var xs, ys, ws, hs, isPrimary [maxNativeDisplays]C.int
 	n := int(C.nexDisplayList(&xs[0], &ys[0], &ws[0], &hs[0], &isPrimary[0], C.int(maxNativeDisplays)))

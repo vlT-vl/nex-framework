@@ -58,8 +58,6 @@ const licenseFile = {
   content: licenseText,
 };
 
-// ── sub-components ────────────────────────────────────────────────────────────
-
 function ThemeSwitch({ preference, theme, onChange }) {
   const modes = [
     { id: "system", label: "system", icon: FiMonitor },
@@ -106,7 +104,6 @@ function StatusBar({ info, sess, beat, theme, themePreference, onThemeChange, on
         <ThemeSwitch preference={themePreference} theme={theme} onChange={onThemeChange} />
         <div className="bridge">
           <span>{sess ? `session ${sess.id.slice(0, 8)}` : "connecting…"}</span>
-          {/* key={beat} restarts CSS animation on every tick */}
           <span
             key={beat}
             className={`dot${sess ? " online" : ""}${beat > 0 ? " beat" : ""}`}
@@ -122,13 +119,8 @@ function FileModal({ open, onClose, onLog, file, kicker, format = "markdown" }) 
   const renderedContent = useMemo(() => {
     if (format !== "markdown") return null;
     const html = renderMarkdown(file.content);
-    // The masthead <img src="res/nex.svg"> only tracks the OS-level
-    // prefers-color-scheme; it goes invisible when the in-app theme switch
-    // (data-theme) diverges from the OS setting (e.g. dark theme picked
-    // while the OS is in light mode). Inlining the SVG lets .docs-content's
-    // CSS override .wordmark's fill from data-theme instead.
     return html.replace(
-      /<img[^>]*\bsrc="\/nex\.svg"[^>]*>/,
+      /<picture>[\s\S]*?<\/picture>/,
       `<span class="masthead-logo">${nexMastheadSvg}</span>`
     );
   }, [file.content, format]);
@@ -286,9 +278,7 @@ function initialConsoleHeight() {
   try {
     const saved = Number(localStorage.getItem(CONSOLE_HEIGHT_KEY));
     if (Number.isFinite(saved) && saved > 0) return clampConsoleHeight(saved);
-  } catch {
-    // Keep default height when storage is unavailable.
-  }
+  } catch {}
   return clampConsoleHeight(CONSOLE_DEFAULT_HEIGHT);
 }
 
@@ -305,9 +295,7 @@ function Console({ lines, onClear }) {
   useEffect(() => {
     try {
       localStorage.setItem(CONSOLE_HEIGHT_KEY, String(height));
-    } catch {
-      // Height persistence is optional.
-    }
+    } catch {}
   }, [height]);
 
   useEffect(() => {
@@ -387,8 +375,6 @@ function Console({ lines, onClear }) {
   );
 }
 
-// ── main app ──────────────────────────────────────────────────────────────────
-
 export default function App() {
   const [info, setInfo] = useState(null);
   const [frameworkInfo, setFrameworkInfo] = useState(null);
@@ -422,7 +408,6 @@ export default function App() {
     nex.os.info().then(setOsData).catch(() => {});
     nex.session().then(setSess).catch(() => {});
 
-    // live beat from Go backend
     const off = nex.on("tick", () => setBeat((b) => b + 1));
     const offSecond = nex.on("app.second-instance", (payload) =>
       log(`second instance: ${JSON.stringify(payload)}`, "info")
@@ -453,7 +438,6 @@ export default function App() {
     setTheme(applied.theme);
   }
 
-  // Interactive demos for showcase APIs.
   const demos = useMemo(
     () => {
       const tempRoot = String(
@@ -580,11 +564,6 @@ export default function App() {
   );
 
   async function onRun(id, fn) {
-    // Privileged APIs are gated backend-side (internal/app/app.go,
-    // Authorize -> confirmPrivileged): the Go framework itself shows a
-    // native confirmation dialog before running them, so every frontend
-    // (this showcase or any other) gets the same guarantee without having
-    // to reimplement it in JS.
     log(`→ ${id}`);
     try {
       const r = await fn();
@@ -651,7 +630,6 @@ export default function App() {
       <main className="wrap">
         <NexLogo className="brand-intro" />
 
-        {/* Framework intro */}
         <section className="section">
           <div className="framework-note">
             <div>
@@ -674,7 +652,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* App info */}
         <section className="section">
           <span className="label section-title">
             <FiInfo aria-hidden="true" className="ui-icon" />
@@ -696,7 +673,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* Framework info */}
         <section className="section">
           <span className="label section-title">
             <FiLayers aria-hidden="true" className="ui-icon" />
@@ -714,7 +690,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* Public env vars */}
         <section className="section">
           <span className="label">Public env (VITE_*)</span>
           <div className="panel">
@@ -738,13 +713,11 @@ export default function App() {
           </div>
         </section>
 
-        {/* API explorer */}
         <section className="section">
           <span className="label">Available APIs</span>
           <ApiExplorer demos={demos} onRun={onRun} />
         </section>
 
-        {/* Console */}
         <section className="section console-dock">
           <Console lines={lines} onClear={() => setLines([])} />
         </section>

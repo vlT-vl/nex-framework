@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="res/nex.svg" alt="nex" width="150" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="res/nex-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="res/nex-light.svg">
+    <img src="res/nex-light.svg" alt="nex" width="150">
+  </picture>
 </p>
 
 <p align="center">
@@ -8,11 +12,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0--R110726-blue?style=flat-square" alt="version"/>
-  <img src="https://img.shields.io/badge/go-1.26.4-00ADD8?style=flat-square&logo=go" alt="go"/>
-  <img src="https://img.shields.io/badge/react-19.2.7-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react"/>
+  <img src="https://img.shields.io/badge/version-0.1.1--R071026-blue?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/go-1.27.1-00ADD8?style=flat-square&logo=go" alt="go"/>
+  <img src="https://img.shields.io/badge/react-19.3.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react"/>
   <img src="https://img.shields.io/badge/react--icons-5.7.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react-icons"/>
-  <img src="https://img.shields.io/badge/vite-8.1.3-646CFF?style=flat-square&logo=vite&logoColor=white" alt="vite"/>
+  <img src="https://img.shields.io/badge/vite-8.3.2-646CFF?style=flat-square&logo=vite&logoColor=white" alt="vite"/>
   <img src="https://img.shields.io/badge/license-proprietary-critical?style=flat-square" alt="license"/>
 </p>
 
@@ -95,7 +99,7 @@ duplicated in UI code: React, React Icons, and Vite come from
 
 | Tool | Version |
 |---|---|
-| Go | 1.26.4+ |
+| Go | 1.27.1+ |
 | Node | 20.19+ or 22.12+ with npm |
 | garble | installed automatically by `build.go` when missing |
 | C compiler | required by cgo/webview bindings |
@@ -110,6 +114,16 @@ longer supported by the frontend toolchain.
 ```bash
 xcode-select --install
 ```
+
+nex targets macOS 14 (Sonoma) as the minimum deployment version
+(`macOSDeploymentTarget` in `build.go`, applied via `MACOSX_DEPLOYMENT_TARGET`/
+`CGO_CFLAGS`/`CGO_LDFLAGS` and mirrored in the packaged `.app`'s
+`LSMinimumSystemVersion`). A single release build run on any supported macOS
+host therefore covers the last four annual macOS releases: Sonoma (14),
+Sequoia (15), Tahoe (26), and Golden Gate (27) — without carrying
+compatibility code for anything older. Raising or lowering the floor means
+changing `macOSDeploymentTarget` in `build.go` (release builds) and
+`macOSMinimumSystemVersion` in `dev.go` (dev bundle) together.
 
 The macOS targets are always built as both `darwin/amd64` and `darwin/arm64`.
 When the build runs on macOS, nex produces macOS `amd64`, macOS `arm64`, and
@@ -270,10 +284,12 @@ nex-framework/
 │   ├── CenturyGothic.ttf # Brand font for the nex wordmark
 │   ├── nexcube.svg       # Blue cube symbol used in the React UI
 │   ├── nexicon.svg       # App/favicon icon source
-│   └── nex.svg           # README/DOCS masthead logo — single SVG, self-switches
-│                         #   light/dark ink via an embedded `@media (prefers-color-scheme)`
-│                         #   rule, embedded CenturyGothic @font-face, same cube artwork
-│                         #   as nexcube.svg
+│   ├── nex-light.svg      # README/DOCS masthead, light-background variant (dark ink)
+│   ├── nex-dark.svg       # README/DOCS masthead, dark-background variant (light ink)
+│   └── nex.svg           # In-app Docs/License modal masthead only — single SVG with an
+│                         #   embedded `@media (prefers-color-scheme)` rule, inlined as raw
+│                         #   markup so `data-theme` CSS can override `.wordmark`'s fill;
+│                         #   not used by README/DOCS static rendering (see below)
 ├── build.go              # Build/release/obfuscate/clean
 ├── dev.go                # Local Vite HMR + Go runner
 ├── main.go               # App entry point and frontend embed
@@ -387,7 +403,7 @@ import { call, on, dialog, fs, shell, app, framework } from "./lib/nex.js";
 const { message } = await call("user.greet", { name: "Ada" });
 const off = on("tick", ({ n, at }) => console.log(n, at));
 const info = await app.info();
-const fw = await framework.info(); // { id: "nex@0.1.0", ... }
+const fw = await framework.info(); // { id: "nex@0.1.1", ... }
 const result = await dialog.open({ title: "Open" });
 const entries = await fs.list("/tmp");
 const proc = await shell.exec("uname -a", { timeoutMs: 5000 });
@@ -486,7 +502,7 @@ back to `res/nexicon.svg`. `NEX_APP_ID` drives the single-instance id and
 platform bundle/application identifiers, with a title slug as fallback.
 `NEX_APP_VERSION` and `NEX_APP_BUILD` drive release folder naming; the app
 version comes exclusively from `.env`. Every build writes into
-`release/<version>-<build>/`, for example `release/0.1.0-R110726/`.
+`release/<version>-<build>/`, for example `release/0.1.1-R071026/`.
 
 One `go run build.go build` / `make build` run builds every target supported
 by the current host:
@@ -572,9 +588,9 @@ process environment values.
 ```env
 # App identity. These values belong to the app, not to the nex framework.
 NEX_APP_NAME=nex-app-template
-NEX_APP_VERSION=0.1.0
-NEX_APP_BUILD=R110726
-NEX_APP_UPDATED=11 Luglio 2026
+NEX_APP_VERSION=0.1.1
+NEX_APP_BUILD=R071026
+NEX_APP_UPDATED=7 Ottobre 2026
 NEX_APP_AUTHOR=© 2026 vlT di Veronesi Lorenzo
 NEX_APP_ICON=res/nexicon.svg
 NEX_APP_ID=dev.vlt.nex-app-template
@@ -766,7 +782,7 @@ const off = on("data-updated", (payload) => console.log(payload));
 ### framework
 
 Framework metadata is intentionally separate from application metadata. Use this
-when the UI needs to show the nex runtime itself, for example `nex@0.1.0`.
+when the UI needs to show the nex runtime itself, for example `nex@0.1.1`.
 
 | Helper | Backend | Params | Returns |
 |---|---|---|---|

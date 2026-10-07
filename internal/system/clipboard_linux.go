@@ -1,11 +1,5 @@
 //go:build linux
 
-// Package system: native Linux clipboard via GTK's GtkClipboard, reusing the
-// gtk+-3.0 linkage already required by webview_go's GTK/WebKitGTK backend
-// (libgtk-3-dev is already a documented Linux build requirement) — no shell
-// subprocess (wl-copy/xclip/xsel) is spawned. GTK's clipboard API is backend
-// agnostic (X11 and Wayland both go through GdkDisplay), so this also works
-// under Wayland without a separate wl-clipboard dependency.
 package system
 
 /*

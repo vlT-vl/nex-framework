@@ -9,8 +9,6 @@ package system
 #include <IOKit/ps/IOPSKeys.h>
 #include <CoreFoundation/CoreFoundation.h>
 
-// Reads the same power source data `pmset -g batt` reads, directly via
-// IOKit's power-source API — no subprocess spawned.
 static int nexBatteryInfo(int *percent, int *charging, int *onACPower, int *hasBattery) {
     *percent = -1;
     *charging = 0;
@@ -58,7 +56,6 @@ static int nexBatteryInfo(int *percent, int *charging, int *onACPower, int *hasB
 */
 import "C"
 
-// nativePowerInfo replaces `pmset -g batt`.
 func nativePowerInfo() map[string]any {
 	var percent, charging, onAC, hasBattery C.int
 	ok := C.nexBatteryInfo(&percent, &charging, &onAC, &hasBattery)

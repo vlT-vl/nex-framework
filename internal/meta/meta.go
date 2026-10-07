@@ -1,5 +1,3 @@
-// Package meta contains nex framework-level identity.
-// Set at build time with -ldflags "-X nex/internal/meta.Build=R... -X ...".
 package meta
 
 import (
@@ -11,22 +9,11 @@ import (
 const Name = "nex"
 
 var (
-	Version = "0.1.0"
-	Build   = "R110726"
-	Updated = "11 Luglio 2026"
+	Version = "0.1.1"
+	Build   = "R071026"
+	Updated = "7 Ottobre 2026"
 	Author  = "© 2026 vlT di Veronesi Lorenzo"
 
-	// GoVersion, ZenityVersion and WebviewVersion are set at build time via
-	// -ldflags "-X nex/internal/meta.GoVersion=... -X nex/internal/meta.ZenityVersion=... -X nex/internal/meta.WebviewVersion=..."
-	// (see build.go). Runtime introspection (debug.ReadBuildInfo / go.mod
-	// parsing, used as a fallback in Stack below) is unreliable in a
-	// packaged app: garble deliberately blanks/strips build info (so it
-	// doesn't leak pre-obfuscation module paths) — bi.GoVersion and
-	// bi.Deps can both come back empty, not just Deps — and go.mod is read
-	// via a path relative to the working directory, which only resolves
-	// when it happens to be the project root — true for `go run` but not
-	// for a double-clicked .app. Left empty here so `go run`/`make dev`
-	// (which don't pass these ldflags) keep working via the fallback.
 	GoVersion      string
 	ZenityVersion  string
 	WebviewVersion string
@@ -58,7 +45,7 @@ func Stack() map[string]string {
 		out["webview_go"] = WebviewVersion
 	}
 	if GoVersion != "" && ZenityVersion != "" && WebviewVersion != "" {
-		return out // set at build time — skip the fragile runtime introspection below
+		return out
 	}
 	bi, ok := debug.ReadBuildInfo()
 	if ok && GoVersion == "" && bi.GoVersion != "" {

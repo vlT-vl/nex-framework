@@ -1,7 +1,5 @@
 //go:build darwin
 
-// Package system: native macOS "open with default app" / "reveal in Finder"
-// via NSWorkspace (Cocoa) — no `open`/`open -R` subprocess is spawned.
 package system
 
 /*
@@ -11,9 +9,6 @@ package system
 #import <Cocoa/Cocoa.h>
 #include <stdlib.h>
 
-// nexOpenTarget opens a URL (any scheme) or a plain filesystem path with the
-// user's default handler application, via NSWorkspace — equivalent to the
-// `open` CLI, but without spawning it.
 static int nexOpenTarget(const char *target) {
     @autoreleasepool {
         NSString *str = [NSString stringWithUTF8String:target];
@@ -26,8 +21,6 @@ static int nexOpenTarget(const char *target) {
     }
 }
 
-// nexRevealInFinder selects a file/folder in Finder — equivalent to
-// `open -R <path>`, but without spawning it.
 static int nexRevealInFinder(const char *path) {
     @autoreleasepool {
         NSString *str = [NSString stringWithUTF8String:path];

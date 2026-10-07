@@ -1,8 +1,5 @@
 //go:build linux
 
-// Package system: native Linux trash emptying — direct filesystem
-// manipulation of the XDG Trash spec directories (pure Go, no cgo, no
-// subprocess).
 package system
 
 import (
@@ -12,12 +9,6 @@ import (
 	"strings"
 )
 
-// nativeEmptyTrash empties the current user's home trash
-// ($XDG_DATA_HOME/Trash, defaulting to ~/.local/share/Trash), per the
-// freedesktop.org Trash specification: trashed items live under files/ with
-// matching *.trashinfo metadata under info/. Per-mount-point trash
-// directories (.Trash-<uid> on other filesystems) are not covered by this
-// first pass. Returns the number of top-level files/ entries removed.
 func nativeEmptyTrash() (int, error) {
 	base := os.Getenv("XDG_DATA_HOME")
 	if base == "" {

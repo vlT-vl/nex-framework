@@ -1,9 +1,5 @@
 //go:build windows
 
-// Package system: native Windows kernel/CPU/uptime/memory/disk/appearance/
-// power info via the Win32 API through syscall.LazyDLL — pure Go stdlib, no
-// cgo, and no shell subprocess (wmic/ver/reg query/pmset-equivalent CLIs) is
-// spawned.
 package system
 
 import (
@@ -11,8 +7,6 @@ import (
 	"unsafe"
 )
 
-// kernel32 is already declared in clipboard_windows.go (same package); reused
-// here instead of loading a second LazyDLL handle for it.
 var (
 	ntdll    = syscall.NewLazyDLL("ntdll.dll")
 	advapi32 = syscall.NewLazyDLL("advapi32.dll")
@@ -52,10 +46,6 @@ type osVersionInfoExW struct {
 	wReserved           uint8
 }
 
-// nativeKernelInfo / nativePlatformInfo replace `cmd /C ver` and
-// `wmic os get Caption,Version,BuildNumber,OSArchitecture`, via
-// RtlGetVersion (bypasses the GetVersionEx app-compat shim) plus the
-// registry ProductName nex already needs no subprocess to read.
 func windowsVersion() (osVersionInfoExW, bool) {
 	var info osVersionInfoExW
 	info.dwOSVersionInfoSize = uint32(unsafe.Sizeof(info))
@@ -88,9 +78,6 @@ func nativePlatformInfo() map[string]any {
 	return out
 }
 
-// nativeCPUInfo replaces `wmic cpu get Name,NumberOfCores,NumberOfLogicalProcessors`.
-// Core/thread counts are already covered by runtime.NumCPU() in cpuInfo's
-// shared "logical" field; only the brand string is added here.
 func nativeCPUInfo() map[string]any {
 	out := map[string]any{}
 	if name, ok := readRegistryString(hkeyLocalMachine, `HARDWARE\DESCRIPTION\System\CentralProcessor\0`, "ProcessorNameString"); ok {
@@ -99,7 +86,6 @@ func nativeCPUInfo() map[string]any {
 	return out
 }
 
-// nativeUptimeInfo replaces `wmic os get LastBootUpTime`.
 func nativeUptimeInfo() map[string]any {
 	r, _, _ := procGetTickCount64.Call()
 	ms := uint64(r)
@@ -123,8 +109,6 @@ type memoryStatusEx struct {
 	ullAvailExtendedVirtual uint64
 }
 
-// nativeMemoryInfo replaces
-// `wmic OS get FreePhysicalMemory,TotalVisibleMemorySize,FreeVirtualMemory,TotalVirtualMemorySize`.
 func nativeMemoryInfo() map[string]any {
 	var m memoryStatusEx
 	m.dwLength = uint32(unsafe.Sizeof(m))
@@ -143,8 +127,6 @@ func nativeMemoryInfo() map[string]any {
 	}
 }
 
-// nativeDiskInfo replaces
-// `wmic logicaldisk get Caption,FileSystem,FreeSpace,Size,VolumeName`.
 func nativeDiskInfo() []map[string]any {
 	out := []map[string]any{}
 	r, _, _ := procGetLogicalDrives.Call()
@@ -189,7 +171,6 @@ type systemPowerStatus struct {
 	batteryFullLifeTime uint32
 }
 
-// nativePowerInfo replaces `wmic path Win32_Battery get BatteryStatus,EstimatedChargeRemaining`.
 func nativePowerInfo() map[string]any {
 	var status systemPowerStatus
 	r, _, _ := procGetSystemPowerStatus.Call(uintptr(unsafe.Pointer(&status)))
@@ -199,7 +180,7 @@ func nativePowerInfo() map[string]any {
 	out := map[string]any{
 		"onACPower": status.acLineStatus == 1,
 	}
-	// batteryFlag 128 = "no system battery"; 255 = "unknown status".
+
 	hasBattery := status.batteryFlag != 128 && status.batteryFlag != 255
 	out["hasBattery"] = hasBattery
 	if hasBattery {
@@ -211,8 +192,6 @@ func nativePowerInfo() map[string]any {
 	return out
 }
 
-// nativeAppearanceInfo replaces
-// `reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize /v AppsUseLightTheme`.
 func nativeAppearanceInfo() map[string]any {
 	const source = "registry AppsUseLightTheme"
 	v, ok := readRegistryDWORD(hkeyCurrentUser, `Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`, "AppsUseLightTheme")
@@ -257,9 +236,6 @@ func readRegistryString(hkey uintptr, subKey, valueName string) (string, bool) {
 	return syscall.UTF16ToString(buf), true
 }
 
-// registryHasValue reports whether a named value exists under a key,
-// regardless of its type/content — used for presence checks like the
-// "URL Protocol" marker value on a registered scheme's registry key.
 func registryHasValue(hkey uintptr, subKey, valueName string) bool {
 	var hKey syscall.Handle
 	subKeyPtr, err := syscall.UTF16PtrFromString(subKey)
@@ -282,9 +258,6 @@ func registryHasValue(hkey uintptr, subKey, valueName string) bool {
 	return r == 0
 }
 
-// nativeProtocolStatus replaces `reg query HKCU\Software\Classes\<scheme> /s`
-// (and the HKCR fallback), checking for the standard "URL Protocol" marker
-// value Windows uses to register a custom URL scheme handler.
 func nativeProtocolStatus(scheme string) (bool, string, string) {
 	roots := []struct {
 		hkey uintptr
@@ -301,9 +274,6 @@ func nativeProtocolStatus(scheme string) (bool, string, string) {
 	return false, "", "registry"
 }
 
-// nativeFileAssociation replaces `reg query HKCU\Software\Classes\<ext> /ve`
-// (and the HKCR fallback), reading the key's default (unnamed) value, which
-// Windows uses to store the ProgID handling that extension.
 func nativeFileAssociation(ext string) (bool, string, string, string) {
 	roots := []struct {
 		hkey uintptr
