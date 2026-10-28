@@ -8,18 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
-	"io"
 	"log"
 	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -124,7 +120,6 @@ func Register(reg core.Registrar) {
 	reg.Register("sys.shortcuts.clear", shortcutsClear)
 	reg.Register("sys.shortcuts.list", shortcutsList)
 	reg.Register("sys.protocol.status", protocolStatus)
-	reg.Register("sys.updater.check", updaterCheck)
 	reg.Register("sys.secureStorage.isAvailable", secureStorageAvailable)
 	reg.Register("sys.fileAssociations.status", fileAssociationsStatus)
 	reg.Register("sys.recentDocs.add", recentDocsAdd)
@@ -1717,87 +1712,6 @@ func protocolStatus(_ *core.Context, params json.RawMessage) (any, error) {
 	}, nil
 }
 
-func updaterCheck(_ *core.Context, params json.RawMessage) (any, error) {
-	var p struct {
-		URL     string `json:"url"`
-		Current string `json:"current"`
-	}
-	if err := pBind(params, &p); err != nil {
-		return nil, core.Errorf("bad_request", "%v", err)
-	}
-
-	if envURL := os.Getenv("NEX_UPDATE_URL"); envURL != "" {
-		p.URL = envURL
-	}
-	if p.Current == "" {
-		p.Current = os.Getenv("NEX_APP_VERSION")
-	}
-	if p.Current == "" {
-		p.Current = os.Getenv("APP_VERSION")
-	}
-	out := map[string]any{
-		"configured":       p.URL != "",
-		"current":          p.Current,
-		"updateAvailable":  false,
-		"provider":         p.URL,
-		"checkedAt":        time.Now().Format(time.RFC3339),
-		"providerProtocol": "",
-	}
-	if p.URL == "" {
-		return out, nil
-	}
-
-	parsed, err := url.Parse(p.URL)
-	if err != nil {
-		return nil, core.Errorf("bad_request", "invalid update url: %v", err)
-	}
-	if parsed.Scheme != "https" {
-		return nil, core.Errorf("bad_request", "update url must use https")
-	}
-	host := parsed.Hostname()
-	if ip := net.ParseIP(host); ip != nil {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
-			return nil, core.Errorf("bad_request", "update url host is not allowed")
-		}
-	} else {
-		lc := strings.ToLower(host)
-		if lc == "localhost" || strings.HasSuffix(lc, ".local") || strings.HasSuffix(lc, ".internal") {
-			return nil, core.Errorf("bad_request", "update url host is not allowed")
-		}
-	}
-	req, err := http.NewRequest(http.MethodGet, p.URL, nil)
-	if err != nil {
-		return nil, core.Errorf("bad_request", "invalid update url: %v", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	client := http.Client{Timeout: 5 * time.Second}
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, core.Errorf("network", "%v", err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return nil, core.Errorf("http", "update provider returned HTTP %d", res.StatusCode)
-	}
-	var payload struct {
-		Version   string `json:"version"`
-		URL       string `json:"url"`
-		Notes     string `json:"notes"`
-		Mandatory bool   `json:"mandatory"`
-	}
-
-	if err := json.NewDecoder(io.LimitReader(res.Body, 512*1024)).Decode(&payload); err != nil {
-		return nil, core.Errorf("bad_response", "invalid update JSON: %v", err)
-	}
-	out["latest"] = payload.Version
-	out["url"] = payload.URL
-	out["notes"] = payload.Notes
-	out["mandatory"] = payload.Mandatory
-	out["providerProtocol"] = "json"
-	out["updateAvailable"] = compareVersion(payload.Version, p.Current) > 0
-	return out, nil
-}
-
 func secureStorageAvailable(_ *core.Context, _ json.RawMessage) (any, error) {
 	backend := ""
 	available := false
@@ -2000,40 +1914,6 @@ func removeString(items []string, value string) []string {
 		if item != value {
 			out = append(out, item)
 		}
-	}
-	return out
-}
-
-func compareVersion(a, b string) int {
-	as := versionParts(a)
-	bs := versionParts(b)
-	for i := 0; i < len(as) || i < len(bs); i++ {
-		av, bv := 0, 0
-		if i < len(as) {
-			av = as[i]
-		}
-		if i < len(bs) {
-			bv = bs[i]
-		}
-		if av > bv {
-			return 1
-		}
-		if av < bv {
-			return -1
-		}
-	}
-	return 0
-}
-
-func versionParts(v string) []int {
-	v = strings.TrimLeft(strings.TrimSpace(v), "vV")
-	fields := strings.FieldsFunc(v, func(r rune) bool {
-		return r == '.' || r == '-' || r == '_' || r == '+'
-	})
-	out := make([]int, 0, len(fields))
-	for _, field := range fields {
-		n, _ := strconv.Atoi(strings.TrimFunc(field, func(r rune) bool { return r < '0' || r > '9' }))
-		out = append(out, n)
 	}
 	return out
 }

@@ -23,6 +23,7 @@ import (
 	"nex/internal/meta"
 	"nex/internal/session"
 	"nex/internal/system"
+	"nex/internal/updater"
 )
 
 type Config struct {
@@ -56,6 +57,10 @@ type Config struct {
 	OnWindowEval       func(*core.Context, core.SecurityDecision) error
 	OnAppExit          func(*core.Context, core.SecurityDecision) error
 	OnOpenURL          func(*core.Context, core.SecurityDecision) error
+
+	UpdateURL          string
+	UpdateAllowedHosts []string
+	UpdatePublicKeys   [][]byte
 }
 
 type App struct {
@@ -66,6 +71,8 @@ type App struct {
 	handlers  map[string]core.HandlerFunc
 	env       *config.Env
 	single    *singleInstance
+	upd       *updater.Updater
+	updOnce   sync.Once
 	winMu     sync.RWMutex
 	winTitle  string
 	winWidth  int
@@ -112,6 +119,8 @@ func New(cfg Config) *App {
 		winHint:   "none",
 	}
 	system.Register(a)
+	runUpdaterBootstrap(a.updaterAppID())
+	a.setupUpdater()
 	a.Register("sys.app.info", a.sysAppInfo)
 	a.Register("sys.framework.info", a.sysFrameworkInfo)
 	a.Register("sys.framework.stack", a.sysFrameworkStack)
@@ -178,7 +187,7 @@ func (a *App) Authorize(c *core.Context, d core.SecurityDecision) error {
 			return a.cfg.OnWindowEval(c, d)
 		}
 	case "app":
-		if (d.Operation == "exit" || d.Operation == "restart" || d.Operation == "quit") && a.cfg.OnAppExit != nil {
+		if (d.Operation == "exit" || d.Operation == "restart" || d.Operation == "quit" || d.Operation == "update.install") && a.cfg.OnAppExit != nil {
 			return a.cfg.OnAppExit(c, d)
 		}
 	}
@@ -190,7 +199,7 @@ func (a *App) Authorize(c *core.Context, d core.SecurityDecision) error {
 }
 
 var privilegedDecisions = map[string]map[string]bool{
-	"app":        {"restart": true, "exit": true, "quit": true},
+	"app":        {"restart": true, "exit": true, "quit": true, "update.install": true},
 	"shell":      {"exec": true, "run": true, "start": true},
 	"filesystem": {"read": true, "write": true, "list": true, "exists": true, "stat": true, "mkdir": true, "remove": true, "rename": true, "trashEmpty": true},
 	"window":     {"eval": true},
@@ -278,12 +287,17 @@ func (a *App) WindowInfo() map[string]any {
 }
 
 func (a *App) Quit() {
+	a.tryQuit()
+}
+
+func (a *App) tryQuit() bool {
 	if a.cfg.OnBeforeClose != nil && a.cfg.OnBeforeClose(a) {
-		return
+		return false
 	}
 	if a.wv != nil {
 		a.wv.Dispatch(func() { a.wv.Terminate() })
 	}
+	return true
 }
 
 func (a *App) ReleaseSingleInstance() {
@@ -467,6 +481,7 @@ func (a *App) handleDomReady(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.OnDomReady != nil {
 		go a.cfg.OnDomReady(a)
 	}
+	a.startAutoUpdate()
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

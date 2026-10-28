@@ -105,6 +105,14 @@ func doBuild(release, obfuscate bool) error {
 		return err
 	}
 
+	garblePath := ""
+	if obfuscate {
+		garblePath, err = ensureGarble()
+		if err != nil {
+			return err
+		}
+	}
+
 	if err := ensureGoModules(); err != nil {
 		return err
 	}
@@ -122,10 +130,6 @@ func doBuild(release, obfuscate bool) error {
 	buildPrefix := []string{"build"}
 	garbleScope := ""
 	if obfuscate {
-		garblePath, err := ensureGarble()
-		if err != nil {
-			return err
-		}
 		modulePath, err := modulePathFromGoMod()
 		if err != nil {
 			return err
@@ -161,23 +165,94 @@ func ensureGoModules() error {
 
 func ensureGarble() (string, error) {
 	if garblePath, err := exec.LookPath("garble"); err == nil {
+		if err := checkGarbleCompatible(garblePath); err != nil {
+			return "", err
+		}
 		return garblePath, nil
 	}
 	fmt.Println("→ garble not found; installing mvdan.cc/garble@latest")
 	if err := runCmd(".", nil, "go", "install", "mvdan.cc/garble@latest"); err != nil {
 		return "", err
 	}
-	if garblePath, err := exec.LookPath("garble"); err == nil {
-		return garblePath, nil
+	garblePath, err := exec.LookPath("garble")
+	if err != nil {
+		garblePath, err = goBinPath("garble")
+		if err != nil {
+			return "", err
+		}
+		if _, err := os.Stat(garblePath); err != nil {
+			return "", fmt.Errorf("garble installed but not found at %s", garblePath)
+		}
 	}
-	garblePath, err := goBinPath("garble")
+	if err := checkGarbleCompatible(garblePath); err != nil {
+		return "", err
+	}
+	return garblePath, nil
+}
+
+func checkGarbleCompatible(garblePath string) error {
+	installed, err := goEnv("GOVERSION")
+	if err != nil {
+		return nil
+	}
+	built, err := goVersionOfBinary(garblePath)
+	if err != nil {
+		return nil
+	}
+	iMajor, iMinor, ok := goMajorMinor(installed)
+	if !ok {
+		return nil
+	}
+	bMajor, bMinor, ok := goMajorMinor(built)
+	if !ok {
+		return nil
+	}
+	if bMajor < iMajor || (bMajor == iMajor && bMinor < iMinor) {
+		return fmt.Errorf("garble at %s was built with %s but the installed Go is %s: this garble is too old for the installed Go and the obfuscated build would fail.\nUpdate it for compatibility, then run the command again:\n  go install mvdan.cc/garble@latest", garblePath, built, installed)
+	}
+	return nil
+}
+
+func goVersionOfBinary(path string) (string, error) {
+	out, err := exec.Command("go", "version", "-m", path).Output()
 	if err != nil {
 		return "", err
 	}
-	if _, err := os.Stat(garblePath); err != nil {
-		return "", fmt.Errorf("garble installed but not found at %s", garblePath)
+	line, _, _ := strings.Cut(string(out), "\n")
+	i := strings.LastIndex(line, ": ")
+	if i < 0 {
+		return "", fmt.Errorf("unexpected go version -m output: %q", line)
 	}
-	return garblePath, nil
+	fields := strings.Fields(line[i+2:])
+	if len(fields) == 0 {
+		return "", fmt.Errorf("unexpected go version -m output: %q", line)
+	}
+	return fields[0], nil
+}
+
+func goMajorMinor(version string) (int, int, bool) {
+	parts := strings.SplitN(strings.TrimPrefix(version, "go"), ".", 3)
+	if len(parts) < 2 {
+		return 0, 0, false
+	}
+	major, ok := leadingInt(parts[0])
+	if !ok {
+		return 0, 0, false
+	}
+	minor, ok := leadingInt(parts[1])
+	if !ok {
+		return 0, 0, false
+	}
+	return major, minor, true
+}
+
+func leadingInt(s string) (int, bool) {
+	end := 0
+	for end < len(s) && s[end] >= '0' && s[end] <= '9' {
+		end++
+	}
+	n, err := strconv.Atoi(s[:end])
+	return n, err == nil
 }
 
 func goBinPath(name string) (string, error) {
@@ -288,7 +363,7 @@ func doRequirements() error {
 	fmt.Println("expected host tools:")
 	fmt.Println("  - Go 1.27.1+")
 	fmt.Println("  - Node 20.19+ or 22.12+ with npm")
-	fmt.Println("  - garble on PATH, or network access for: go install mvdan.cc/garble@latest")
+	fmt.Println("  - garble on PATH built with a Go version at least as recent as the installed one, or network access for: go install mvdan.cc/garble@latest")
 	fmt.Println("  - cgo toolchains for every target selected for this host")
 	fmt.Println()
 	fmt.Println("target toolchains:")
@@ -315,12 +390,26 @@ func doRequirements() error {
 	}
 	fmt.Println()
 
+	garbleOK := true
+	if garblePath, err := exec.LookPath("garble"); err != nil {
+		fmt.Println("garble: not found — will be installed automatically on first obfuscated build")
+	} else if err := checkGarbleCompatible(garblePath); err != nil {
+		fmt.Printf("garble: %s  ✗\n", garblePath)
+		fmt.Fprintln(os.Stderr, err)
+		garbleOK = false
+	} else {
+		fmt.Printf("garble: %s  ✓\n", garblePath)
+	}
+	fmt.Println()
+
 	missing := collectMissingBuildRequirements(targets)
-	if len(missing) == 0 {
+	if len(missing) == 0 && garbleOK {
 		fmt.Println("OK: build requirements found")
 		return nil
 	}
-	fmt.Fprintln(os.Stderr, formatMissingRequirements(missing))
+	if len(missing) > 0 {
+		fmt.Fprintln(os.Stderr, formatMissingRequirements(missing))
+	}
 	return errors.New("requirements not satisfied")
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FiBookOpen,
   FiCpu,
+  FiDownload,
   FiExternalLink,
   FiFileText,
   FiInfo,
@@ -26,6 +27,7 @@ import {
 } from "./lib/theme.js";
 import { renderMarkdown } from "./lib/markdown.js";
 import { NexLogo } from "./components/NexLogo.jsx";
+import { UpdaterPanel } from "./components/UpdaterPanel.jsx";
 import frontendPkg from "../package.json";
 import docsMarkdown from "../../DOCS.md?raw";
 import licenseText from "../../LICENSE?raw";
@@ -511,7 +513,16 @@ export default function App() {
         "sys.shortcuts.clear": () => nex.shortcuts.clear(),
         "sys.shortcuts.list": () => nex.shortcuts.list(),
         "sys.protocol.status": () => nex.protocol.status("nex"),
-        "sys.updater.check": () => nex.updater.check(),
+        "sys.updater.check": () => nex.updater.check({ manual: true }),
+        "sys.updater.getState": () => nex.updater.getState(),
+        "sys.updater.download": () => nex.updater.download(),
+        "sys.updater.install": () => nex.updater.install(),
+        "sys.updater.confirm": () => nex.updater.confirm(),
+        "sys.updater.getLastResult": () => nex.updater.getLastResult(),
+        "sys.updater.setSettings": async () => {
+          const state = await nex.updater.getState();
+          return nex.updater.setSettings(state.settings);
+        },
         "sys.secureStorage.isAvailable": () => nex.secureStorage.isAvailable(),
         "sys.fileAssociations.status": () => nex.fileAssociations.status(".nex"),
         "sys.recentDocs.add": () => nex.recentDocs.add(osData?.home ?? "/tmp"),
@@ -688,6 +699,14 @@ export default function App() {
               <div>{frameworkInfo?.author ?? "…"}</div>
             </div>
           </div>
+        </section>
+
+        <section className="section">
+          <span className="label section-title">
+            <FiDownload aria-hidden="true" className="ui-icon" />
+            Updates
+          </span>
+          <UpdaterPanel />
         </section>
 
         <section className="section">

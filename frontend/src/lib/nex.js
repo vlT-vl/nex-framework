@@ -24,6 +24,14 @@ function requireBridge() {
   }
 }
 
+let updaterConfirmStarted = false;
+
+function confirmUpdaterOnce() {
+  if (updaterConfirmStarted) return;
+  updaterConfirmStarted = true;
+  call("sys.updater.confirm").catch(() => {});
+}
+
 export async function call(method, params = {}) {
   requireBridge();
   const res = await fetch(`${API_BASE}/rpc`, {
@@ -37,6 +45,7 @@ export async function call(method, params = {}) {
   if (!res.ok) throw new nexError(`http_${res.status}`, `HTTP ${res.status}`);
   const data = await res.json();
   if (data.error) throw new nexError(data.error.code, data.error.message);
+  confirmUpdaterOnce();
   return data.result;
 }
 
@@ -472,7 +481,15 @@ export const protocol = {
 };
 
 export const updater = {
+  getState: () => call("sys.updater.getState"),
   check: (opts = {}) => call("sys.updater.check", opts),
+  download: () => call("sys.updater.download"),
+  install: () => call("sys.updater.install"),
+  confirm: () => call("sys.updater.confirm"),
+  getLastResult: () => call("sys.updater.getLastResult"),
+  setSettings: (settings) => call("sys.updater.setSettings", settings),
+  onState: (handler) => on("updater.state", handler),
+  onProgress: (handler) => on("updater.progress", handler),
 };
 
 export const secureStorage = {
@@ -547,6 +564,7 @@ const privilegedApiIds = new Set([
   "sys.clipboard.writeText",
   "sys.clipboard.clear",
   "sys.trash.empty",
+  "sys.updater.install",
 ]);
 
 const userMediatedApiIds = new Set([
@@ -711,7 +729,13 @@ export const apiCatalog = [
       { id: "sys.shortcuts.clear", sig: "shortcuts.clear()", desc: "Clear runtime keyboard shortcuts." },
       { id: "sys.shortcuts.list", sig: "shortcuts.list()", desc: "List runtime keyboard shortcuts." },
       { id: "sys.protocol.status", sig: "protocol.status(scheme)", desc: "Inspect OS protocol/deep-link registration for a scheme." },
-      { id: "sys.updater.check", sig: "updater.check(opts?)", desc: "Check a JSON update provider." },
+      { id: "sys.updater.getState", sig: "updater.getState()", desc: "Current updater state, settings and available update." },
+      { id: "sys.updater.check", sig: "updater.check(opts?)", desc: "Check the configured update source (GitHub releases or JSON feed)." },
+      { id: "sys.updater.download", sig: "updater.download()", desc: "Download and verify the available update." },
+      { id: "sys.updater.install", sig: "updater.install()", desc: "Install the downloaded update and restart; rolls back automatically on failure." },
+      { id: "sys.updater.confirm", sig: "updater.confirm()", desc: "Confirm the new build is healthy (called automatically by the bridge)." },
+      { id: "sys.updater.getLastResult", sig: "updater.getLastResult()", desc: "Outcome of the last update attempt, surfaced once." },
+      { id: "sys.updater.setSettings", sig: "updater.setSettings(settings)", desc: "Set automatic check, automatic download and pre-release options." },
       { id: "sys.secureStorage.isAvailable", sig: "secureStorage.isAvailable()", desc: "Detect OS secure storage backend availability." },
       { id: "sys.fileAssociations.status", sig: "fileAssociations.status(ext)", desc: "Inspect OS file association for an extension." },
       { id: "sys.recentDocs.add", sig: "recentDocs.add(path)", desc: "Persist a recent document path." },

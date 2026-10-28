@@ -4,6 +4,20 @@ All notable changes to the nex framework are documented here, newest first.
 This file lists **what** changed per version/build — technical detail, root
 cause, and verification notes live in `handoff.md` only.
 
+## [0.1.2] - R281026 - 2026-10-28
+
+### Added
+
+- Build runner: an outdated garble (built with an older Go than the installed one) is detected before the build starts and reported with an update hint; `make requirements` / `make doctor` fail on it
+- Native automatic updates: `updater.{getState,check,download,install,confirm,getLastResult,setSettings}`, GitHub releases or JSON feed source, SHA-256 verification, optional signature, automatic rollback, `Config.UpdateURL` (compiled-in update URL, overridden by `NEX_UPDATE_URL` in development) / `NEX_UPDATE_ASSET`
+- A release that was rolled back is not downloaded automatically again
+- `UpdaterPanel` component and updater calls in the showcase frontend
+
+### Changed
+
+- Framework version bumped to 0.1.2, build R281026
+- `sys.updater.check` now uses the new updater instead of the former JSON-provider probe
+
 ## [0.1.1] - R071026 - 2026-10-07
 
 ### Changed

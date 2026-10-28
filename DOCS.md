@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.1--R071026-blue?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-0.1.2--R281026-blue?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/go-1.27.1-00ADD8?style=flat-square&logo=go" alt="go"/>
   <img src="https://img.shields.io/badge/react-19.3.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react"/>
   <img src="https://img.shields.io/badge/react--icons-5.7.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react-icons"/>
@@ -73,7 +73,7 @@ before page scripts run, and opens a native OS webview.
 | Brand UI | Reusable `NexLogo` React component with the nex cube and wordmark |
 | Window | title, size, info, fullscreen, reload, print, eval |
 | OS info | host, user, runtime, process, network, disks, memory, time |
-| Desktop/runtime | appearance, power, shortcuts, protocol/file association status, updater check, recent docs |
+| Desktop/runtime | appearance, power, shortcuts, protocol/file association status, automatic updater, recent docs |
 | Env model | `VITE_*` vars are public; all others stay backend-only |
 | Build | `go run build.go` creates obfuscated artifacts |
 | Dev mode | `go run dev.go` starts Vite HMR + Go backend |
@@ -101,7 +101,7 @@ duplicated in UI code: React, React Icons, and Vite come from
 |---|---|
 | Go | 1.27.1+ |
 | Node | 20.19+ or 22.12+ with npm |
-| garble | installed automatically by `build.go` when missing |
+| garble | installed automatically by `build.go` when missing; an existing garble built with an older Go than the installed one is rejected |
 | C compiler | required by cgo/webview bindings |
 | pkg-config | required for Linux WebKitGTK builds |
 | codesign | required on macOS hosts (bundled with Xcode Command Line Tools) — ad-hoc signs every `.app` bundle `dev.go`/`build.go` produce, see [macOS](#macos) |
@@ -264,20 +264,25 @@ nex-framework/
 │       ├── App.jsx
 │       ├── index.css
 │       ├── components/
-│       │   └── NexLogo.jsx # Reusable nex logo; imports CenturyGothic.ttf
+│       │   ├── NexLogo.jsx # Reusable nex logo; imports CenturyGothic.ttf
+│       │   └── UpdaterPanel.jsx # Reusable updater UI (state, check, download, install, settings)
 │       └── lib/
 │           └── nex.js    # JS client bridge
 ├── internal/
 │   ├── app/
-│   │   └── app.go        # HTTP server, RPC, session, webview wiring
+│   │   ├── app.go        # HTTP server, RPC, session, webview wiring
+│   │   ├── singleinstance.go # Single-instance lock and second-instance event
+│   │   ├── updater.go    # Updater host adapter, sys.updater.* handlers, helper bootstrap
+│   │   └── editmenu_*.go / jsdialog_*.go # macOS Edit menu and JS dialogs (no-op elsewhere)
 │   ├── core/
 │   │   └── core.go       # Context, HandlerFunc, Host, RPCError
 │   ├── meta/
 │   │   └── meta.go       # nex framework metadata
 │   ├── session/
 │   │   └── session.go    # Token generation and sliding expiry
-│   └── system/
-│       └── system.go     # Built-in sys.* handlers
+│   ├── system/
+│   │   └── system.go     # Built-in sys.* handlers (+ per-OS native files)
+│   └── updater/          # Update core (stdlib only): sources, verify, download, extract, helper, rollback
 ├── nex/
 │   └── nex.go            # Public API facade
 ├── res/
@@ -296,6 +301,7 @@ nex-framework/
 ├── version.go            # Fallback app version metadata
 ├── .env                  # App identity and runtime environment
 ├── Makefile
+├── CHANGELOG.md
 └── go.mod
 ```
 
@@ -305,7 +311,8 @@ Dependency graph:
 config  ──┐
 session ──┼──► core ──► system ──┐
           │                      ├──► app ──► nex ──► main
-meta ────────────────────────────┘
+meta ────────────────────────────┤
+updater ─────────────────────────┘
           └──────────────────────┘
 webview_go (cgo) ────────────────► app
 zenity     (native dialogs) ─────► system
@@ -403,7 +410,7 @@ import { call, on, dialog, fs, shell, app, framework } from "./lib/nex.js";
 const { message } = await call("user.greet", { name: "Ada" });
 const off = on("tick", ({ n, at }) => console.log(n, at));
 const info = await app.info();
-const fw = await framework.info(); // { id: "nex@0.1.1", ... }
+const fw = await framework.info(); // { id: "nex@0.1.2", ... }
 const result = await dialog.open({ title: "Open" });
 const entries = await fs.list("/tmp");
 const proc = await shell.exec("uname -a", { timeoutMs: 5000 });
@@ -487,10 +494,10 @@ go run build.go [command]
 
 | Command | Action |
 |---|---|
-| `build` | Tidy Go modules, install frontend packages if missing, run `npm run build`, then obfuscated garble builds for the targets supported by the current host into `release/<version>-<build>/` |
+| `build` | Check garble compatibility (obfuscated builds only), tidy Go modules, install frontend packages if missing, run `npm run build`, then obfuscated garble builds for the targets supported by the current host into `release/<version>-<build>/` |
 | `release` | Like build, with `-s -w` added on top |
 | `obfuscate` | Alias for obfuscated release build |
-| `requirements` | Print and validate the host toolchains needed by the selected targets |
+| `requirements` | Print and validate the host toolchains needed by the selected targets, including garble compatibility with the installed Go |
 | `doctor` | Alias for `requirements` |
 | `clean` | Remove `release/` and generated `frontend/dist` assets |
 
@@ -502,7 +509,7 @@ back to `res/nexicon.svg`. `NEX_APP_ID` drives the single-instance id and
 platform bundle/application identifiers, with a title slug as fallback.
 `NEX_APP_VERSION` and `NEX_APP_BUILD` drive release folder naming; the app
 version comes exclusively from `.env`. Every build writes into
-`release/<version>-<build>/`, for example `release/0.1.1-R071026/`.
+`release/<version>-<build>/`, for example `release/0.1.2-R281026/`.
 
 One `go run build.go build` / `make build` run builds every target supported
 by the current host:
@@ -546,7 +553,13 @@ NEX_CXX_WINDOWS_AMD64=/path/to/x86_64-w64-mingw32-g++
 ```
 
 If `garble` is not on `PATH`, `build.go` installs it automatically with
-`go install mvdan.cc/garble@latest` and uses the resulting binary. Garble flags:
+`go install mvdan.cc/garble@latest` and uses the resulting binary. A garble
+already installed is checked against the installed Go: if it was built with an
+older Go minor version, the build stops before touching `release/` and asks you
+to run `go install mvdan.cc/garble@latest` yourself (nex never reinstalls it
+silently). If either version cannot be read, the build is not blocked.
+`make requirements` / `make doctor` report the same condition as a failure.
+The check does not apply to `--plain` builds. Garble flags:
 `-literals -seed=random`. `build.go` also sets `GOGARBLE` to the current module
 path from `go.mod`, for example `nex,nex/...`, so nex code is obfuscated while
 native dependencies such as `zenity` and `webview_go` are left intact. `-tiny`
@@ -588,15 +601,20 @@ process environment values.
 ```env
 # App identity. These values belong to the app, not to the nex framework.
 NEX_APP_NAME=nex-app-template
-NEX_APP_VERSION=0.1.1
-NEX_APP_BUILD=R071026
-NEX_APP_UPDATED=7 Ottobre 2026
+NEX_APP_VERSION=0.1.2
+NEX_APP_BUILD=R281026
+NEX_APP_UPDATED=28 Ottobre 2026
 NEX_APP_AUTHOR=© 2026 vlT di Veronesi Lorenzo
 NEX_APP_ICON=res/nexicon.svg
 NEX_APP_ID=dev.vlt.nex-app-template
 
 # Dev runtime.
 NEX_DEV_SERVER_URL=http://127.0.0.1:5179
+
+# Automatic updates (optional, development override). A packaged app has no .env:
+# its update URL is compiled in through Config.UpdateURL.
+# NEX_UPDATE_URL=https://github.com/owner/repo
+# NEX_UPDATE_ASSET=build-{os}-{arch}.zip
 
 # Backend-only examples. These are visible only to Go code through a.Env() or os.Getenv.
 # NEX_ENV=development
@@ -670,7 +688,7 @@ The frontend showcase labels APIs with these levels:
 |---|---|---|
 | `safe` | Read-only or low-impact framework calls | `app.info`, `os.info`, `screen.info` |
 | `user` | User-mediated calls that open OS UI or handlers | `dialog.open`, `notify.toast`, `shell.openURL` |
-| `privileged` | Calls that can read/write files, run code, or change process state | `shell.exec`, `fs.remove`, `win.eval`, `app.exit`, `trash.empty` |
+| `privileged` | Calls that can read/write files, run code, or change process state | `shell.exec`, `fs.remove`, `win.eval`, `app.exit`, `updater.install`, `trash.empty` |
 
 ### Optional security policy
 
@@ -782,7 +800,7 @@ const off = on("data-updated", (payload) => console.log(payload));
 ### framework
 
 Framework metadata is intentionally separate from application metadata. Use this
-when the UI needs to show the nex runtime itself, for example `nex@0.1.1`.
+when the UI needs to show the nex runtime itself, for example `nex@0.1.2`.
 
 | Helper | Backend | Params | Returns |
 |---|---|---|---|
@@ -1016,12 +1034,87 @@ bundle metadata, or common desktop tools when those facilities exist.
 | `shortcuts.clear()` | `sys.shortcuts.clear` + DOM | none | clears runtime shortcuts |
 | `shortcuts.list()` | `sys.shortcuts.list` | none | registered runtime shortcuts |
 | `protocol.status(scheme)` | `sys.protocol.status` | `{ scheme }` | OS protocol/deep-link registration evidence |
-| `updater.check(opts?)` | `sys.updater.check` | `{ url?, current? }` | checks a JSON update provider; `url` must use `https` and cannot point to loopback or private hosts |
+| `updater.getState()` | `sys.updater.getState` | none | `{ configured, source, currentVersion, currentBuild, status, update, progress, settings, lastCheck, error }` |
+| `updater.check(opts?)` | `sys.updater.check` | `{ manual? }` | queries the configured source; returns the state plus legacy `current`, `latest`, `updateAvailable`, `notes`, `mandatory` |
+| `updater.download()` | `sys.updater.download` | none | downloads the update and verifies SHA-256 (and the optional signature) |
+| `updater.install()` | `sys.updater.install` | none | privileged: swaps the build, restarts, rolls back automatically on failure |
+| `updater.confirm()` | `sys.updater.confirm` | none | confirms the new build is healthy (called automatically by the bridge) |
+| `updater.getLastResult()` | `sys.updater.getLastResult` | none | outcome of the last install attempt (`updated` or `rolledBack:<reason>`), returned once |
+| `updater.setSettings(settings)` | `sys.updater.setSettings` | `{ autoCheck, autoDownload, includePrerelease }` | persists the updater settings |
 | `secureStorage.isAvailable()` | `sys.secureStorage.isAvailable` | none | secure storage backend availability |
 | `fileAssociations.status(ext)` | `sys.fileAssociations.status` | `{ extension }` | OS file association evidence |
 | `recentDocs.add(path)` | `sys.recentDocs.add` | `{ path }` | persists a recent document path |
 | `recentDocs.list()` | `sys.recentDocs.list` | none | persisted recent documents |
 | `recentDocs.clear()` | `sys.recentDocs.clear` | none | clears persisted recent documents |
+
+### updater
+
+Native automatic updates. The feature is disabled until an update URL is set, either
+through `NEX_UPDATE_URL` or through `Config.UpdateURL` (`configured: false` otherwise,
+`check()` returns the state without contacting anything). A packaged app has no `.env`,
+so the URL must be compiled in: pass it from the app's `main.go` through
+`Config.UpdateURL`, with the `.env` value as an override that only matters in development:
+
+```go
+UpdateURL: envValue(envValues, "NEX_UPDATE_URL", "https://github.com/owner/repo"),
+```
+
+| Variable / field | Meaning |
+|---|---|
+| `NEX_UPDATE_URL` | GitHub repository URL (`https://github.com/owner/repo`) or `https` URL of a JSON feed. When set it takes precedence over `Config.UpdateURL` (development and tests) |
+| `Config.UpdateURL` | Compiled-in fallback with the same format, used when `NEX_UPDATE_URL` is empty |
+| `NEX_UPDATE_ASSET` | Optional asset-name pattern, default `build-{os}-{arch}.zip` |
+| `Config.UpdateAllowedHosts` | Optional host allow-list override (default: GitHub API, github.com, `*.githubusercontent.com`) |
+| `Config.UpdatePublicKeys` | Optional list of Ed25519 public keys. The framework embeds none; when set, an unsigned or badly signed release is rejected |
+
+Sources:
+
+| Source | Version read from | Asset |
+|---|---|---|
+| GitHub repository | release tag `v<semver>-R<DDMMYY>` (tags that do not match are ignored; drafts and pre-releases excluded unless enabled) | asset named exactly like the pattern; the SHA-256 comes from the GitHub `digest` field |
+| JSON feed | the feed document (`app` must match the app id) | per-platform asset with `url`, `size`, `sha256`, optional signature |
+
+Flow and guarantees:
+
+- `check` -> `download` -> `install`. Versions are ordered by semver and then by the build date parsed from `R<DDMMYY>`, never by number; downgrades are refused.
+- The SHA-256 is always enforced; a mismatch deletes the staging area. A release without a hash is notify-only (`installable: false`, never installed).
+- Pre-flight before touching anything: install location writable, free space, layout match, staged build answers `--nex-selfcheck`. Root-owned or managed locations are reported as `not_applicable`; no elevation is attempted.
+- `install` is privileged and goes through `Authorize` as `app` / `update.install` (reaches `OnAppExit`; without a policy the user is asked to confirm). `check` and `download` only reach `SecurityPolicy` / `OnSecurityDecision`.
+- Install runs a copy of the executable as a detached helper (started automatically from `nex.New()` before the single-instance lock and any window). It waits for the app to exit, swaps the build, starts the new one and watches it: if it exits early, crashes or does not call `confirm` within the health window (30 s) the previous build is restored and relaunched. `confirm` is called by `nex.js` automatically once the bridge is up. An interrupted install is completed at the next start (`Recover`).
+- In `make dev` (`APP_DEV=1`) the install mode is notify-only: the running binary is never replaced.
+- Settings and the last result live in `<user config dir>/<NEX_APP_ID>/` (directory `0700`, files `0600`). Settings default to `autoCheck` on, `autoDownload` and `includePrerelease` off. With `autoCheck` the check runs exactly once per app start, in the background right after the UI is ready, so it never delays or blocks the app; there is no periodic re-check, and `check()` is the on-demand path. `autoDownload` also downloads an installable update found by that startup check.
+- Events: `updater.state` (full state) and `updater.progress` (`{ received, total }`).
+- Legacy compatibility: `check({ url })` still works for apps that pass a feed URL instead of setting `NEX_UPDATE_URL` or `Config.UpdateURL`; a configured source (environment variable first, then `Config.UpdateURL`) wins, and the first URL accepted is kept for the rest of the run. A feed that only has the legacy fields (`version`, `url`, `notes`, `mandatory`) is check-only.
+- A release whose install was rolled back is remembered (`updater-rejected.json` in the state dir, cleared by the next confirmed update): `check` still reports it, flagged `rolledBack`, but `autoDownload` skips it so the app never loops on a bad release; a manual `download` / `install` is still possible.
+- The helper copy and its job files are deleted when the install ends (on Windows a running executable cannot delete itself, so the leftovers are swept at the next `download`). The result of the last attempt is written before the previous build is relaunched, and the panel re-reads it for a few seconds after start so the `updated` / `rolledBack` banner is not missed.
+- If the app vetoes closing (`OnBeforeClose`) during an install, the single-instance lock is restored, the staged helper is stopped and `install` fails; nothing on disk has been replaced.
+
+Errors are returned as RPC errors whose `code` is one of: `not_configured`, `unauthorized`, `busy`, `source_unreachable`, `rate_limited`, `wrong_app`, `no_update`, `no_hash`, `checksum_mismatch`, `size_mismatch`, `signature_invalid`, `bad_archive`, `not_applicable`, `cancelled`, `state_unavailable`, `rollback_failed`. A release with no asset for the running platform is simply "no update" (no error). Only one of `check` / `download` / `install` runs at a time: a concurrent `check` returns the current state, a concurrent `download` / `install` fails with `busy`.
+
+Release side (one repository per app):
+
+- Public repository, releases published on it, tag `v<MAJOR.MINOR.PATCH>-R<DDMMYY>` (leading `v` optional; tags that do not match are ignored).
+- One zip per platform named `build-<GOOS>-<GOARCH>.zip` (for example `build-darwin-arm64.zip`, `build-windows-amd64.zip`). GitHub exposes the SHA-256 `digest` of each asset: nothing to generate in CI. The release body is shown as the notes.
+- A private source repository cannot be read without a token: mirror the release to a public release-only repository and point the update URL (`Config.UpdateURL`) there.
+- An app that wants authenticity signs each asset's SHA-256 digest with Ed25519 and uploads `<asset>.sig` (base64) next to it; the public key is compiled in through `Config.UpdatePublicKeys` (never read from the runtime `.env`).
+- Non-GitHub hosting: publish a JSON feed and point the update URL (`Config.UpdateURL`) at it:
+
+```json
+{
+  "app": "<NEX_APP_ID>",
+  "version": "0.1.2",
+  "build": "R281026",
+  "date": "2026-10-28",
+  "notes": "…",
+  "mandatory": false,
+  "assets": {
+    "darwin-arm64":  { "url": "https://…", "size": 123, "sha256": "…", "sig": "<base64, optional>", "layout": "bundle", "entry": "app.app" },
+    "windows-amd64": { "url": "https://…", "size": 123, "sha256": "…", "layout": "binary", "entry": "app.exe" }
+  }
+}
+```
+
+Trust model: SHA-256 protects against corrupted, truncated or swapped downloads, but the hash is published by the same party as the archive. **Update security equals the security of the release repository**: whoever can replace the release can replace the hash. Containment that remains is https with a host allow-list, the strictly-newer rule, pre-flight and automatic rollback; apps that need authenticity supply `UpdatePublicKeys`.
 
 ### trash
 
@@ -1167,7 +1260,13 @@ bridge.
 | Shortcuts | `shortcuts.clear()` | `sys.shortcuts.clear` | Clear runtime shortcuts |
 | Shortcuts | `shortcuts.list()` | `sys.shortcuts.list` | List runtime shortcuts |
 | Protocol | `protocol.status(scheme)` | `sys.protocol.status` | Inspect protocol/deep-link registration |
-| Updater | `updater.check(opts?)` | `sys.updater.check` | Check a JSON update provider (`url` must be `https`, no loopback/private hosts) |
+| Updater | `updater.getState()` | `sys.updater.getState` | Read updater state, settings and available update |
+| Updater | `updater.check(opts?)` | `sys.updater.check` | Check the configured update source (GitHub releases or JSON feed) |
+| Updater | `updater.download()` | `sys.updater.download` | Download and verify the available update |
+| Updater | `updater.install()` | `sys.updater.install` | Install the update and restart (privileged, automatic rollback) |
+| Updater | `updater.confirm()` | `sys.updater.confirm` | Confirm the new build is healthy |
+| Updater | `updater.getLastResult()` | `sys.updater.getLastResult` | Outcome of the last update attempt, surfaced once |
+| Updater | `updater.setSettings(settings)` | `sys.updater.setSettings` | Set automatic check, automatic download and pre-release options |
 | Secure storage | `secureStorage.isAvailable()` | `sys.secureStorage.isAvailable` | Detect secure storage backend availability |
 | File associations | `fileAssociations.status(ext)` | `sys.fileAssociations.status` | Inspect file association registration |
 | Recent docs | `recentDocs.add(path)` | `sys.recentDocs.add` | Persist a recent document path |
@@ -1178,7 +1277,7 @@ bridge.
 Outside the current callable API scope: lower-level native window handles for
 minimize/maximize/position/always-on-top, system tray rendering, installer-time
 protocol/file association declaration, secure storage read/write helpers,
-provider-specific updater adapters, global shortcuts, and cross-platform sleep
+global shortcuts, and cross-platform sleep
 prevention.
 
 ---

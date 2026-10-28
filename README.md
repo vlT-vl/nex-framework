@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.1--R071026-blue?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-0.1.2--R281026-blue?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/go-1.27.1-00ADD8?style=flat-square&logo=go" alt="go"/>
   <img src="https://img.shields.io/badge/react-19.3.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react"/>
   <img src="https://img.shields.io/badge/react--icons-5.7.0-61DAFB?style=flat-square&logo=react&logoColor=white" alt="react-icons"/>
@@ -44,6 +44,7 @@ The README is intentionally short. The complete framework manual is in
 | Backend | Go RPC runtime, embedded assets, event bridge |
 | Webview | Native WebView2, WebKit, WebKitGTK backends |
 | Native APIs | Dialogs, notifications, shell, filesystem, clipboard, OS/system info, menu, desktop/runtime integrations |
+| Updates | Native automatic updates from GitHub releases or a JSON feed, SHA-256 verified, automatic rollback |
 | Docs UI | Built-in rendered docs modal for `DOCS.md` |
 | Window APIs | Title, size, fullscreen, reload, print, eval |
 | Security | Loopback-only server, per-launch token, Origin check, optional policy hooks |
@@ -67,7 +68,7 @@ come from `framework.stack()`.
 | Go | 1.27.1+ |
 | Node | 20.19+ or 22.12+ with npm |
 | C compiler | Required by cgo/webview bindings |
-| garble | Installed automatically by `build.go` when missing |
+| garble | Installed automatically by `build.go` when missing; an existing garble built with an older Go than the installed one is rejected with an update hint |
 
 Vite 8 requires Node `^20.19.0` or `>=22.12.0`; older Node 18 runtimes are no
 longer supported by the frontend toolchain.
@@ -160,7 +161,7 @@ release/<NEX_APP_VERSION>-<NEX_APP_BUILD>/
 Example:
 
 ```text
-release/0.1.1-R071026/
+release/0.1.2-R281026/
 ```
 
 Each target gets its own `<GOOS>-<GOARCH>/` subfolder holding a plain-named
@@ -179,9 +180,9 @@ Application metadata belongs to the app and is configured from `.env`.
 
 ```env
 NEX_APP_NAME=nex-app-template
-NEX_APP_VERSION=0.1.1
-NEX_APP_BUILD=R071026
-NEX_APP_UPDATED=7 Ottobre 2026
+NEX_APP_VERSION=0.1.2
+NEX_APP_BUILD=R281026
+NEX_APP_UPDATED=28 Ottobre 2026
 NEX_APP_AUTHOR=© 2026 vlT di Veronesi Lorenzo
 NEX_APP_ICON=res/nexicon.svg
 NEX_APP_ID=dev.vlt.nex-app-template
@@ -205,10 +206,21 @@ release folder, macOS bundle metadata, Windows manifest metadata, and
 authoritative source; process environment values are used only when the key is
 missing from the file.
 
+The update URL is the one value that must not depend on `.env`: a packaged app
+has no `.env` file at runtime. Pass it from `main.go` through `Config.UpdateURL`
+with a compiled fallback; `NEX_UPDATE_URL` in `.env` (or the process environment)
+overrides it and is meant for development only.
+
+```go
+nexpkg.New(nexpkg.Config{
+    UpdateURL: envValue(envValues, "NEX_UPDATE_URL", "https://github.com/owner/repo"),
+})
+```
+
 Framework metadata is separate and available from:
 
 ```js
-const fw = await framework.info(); // { id: "nex@0.1.1", ... }
+const fw = await framework.info(); // { id: "nex@0.1.2", ... }
 ```
 
 `app.info()` and `framework.info()` are separate API calls: app metadata comes
@@ -243,6 +255,7 @@ The frontend bridge is in `frontend/src/lib/nex.js`.
 | `fs` | `fs.read()`, `fs.write()`, `fs.list()`, `fs.remove()` |
 | `clipboard` | `clipboard.readText()`, `clipboard.native.writeText()`, `clipboard.native.isAvailable()`, `clipboard.pasteHandler()` |
 | `desktop` | `appearance.info()`, `power.info()`, `shortcuts.register()`, `protocol.status()`, `recentDocs.list()` |
+| `updater` | `updater.check()`, `updater.download()`, `updater.install()`, `updater.getState()` |
 | `trash` | `trash.empty()` |
 
 The full API table is in [DOCS.md](DOCS.md#native-api-call-table).
